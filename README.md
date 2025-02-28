@@ -1,5 +1,5 @@
-# [Скачивальщик видео](https://t.me/marketplace_helpers_bot)
-#### [Ссылка на приложение](https://t.me/marketplace_helpers_bot) ⬅️
+# [Скачивальщик видео](https://downloader.pozhar.keenetic.pro/)
+#### [Ссылка на приложение](https://downloader.pozhar.keenetic.pro/) ⬅️
 ## Поддерживаемые сервисы
 - Youtube
 - VK видео

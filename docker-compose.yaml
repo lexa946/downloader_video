@@ -1,0 +1,11 @@
+services:
+  downloader_vide:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: downloader_vide:latest
+    ports:
+      - "8084:80"
+    volumes:
+      - ./.env:/.env:ro

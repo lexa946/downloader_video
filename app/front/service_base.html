@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="bg-white p-6 rounded-lg shadow-lg w-96">
+    <h1 class="text-xl font-semibold mt-4 mb-4">Video Downloader</h1>
+    <p class="text-xl font-semibold mb-4">
+        Вы можете скачивать видео с Youtube, Instagram, VK, OK, Tik-Tok.
+    </p>
+    <input id="videoUrl" type="text" placeholder="Введите ссылку на видео" class="w-full p-2 border rounded-md">
+    <button onclick="fetchFormats()" class="mt-2 w-full bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">
+        Получить форматы видео
+    </button>
+
+    <div id="videoPreview" class="mt-4 hidden">
+        <h2 id="videoTitle" class="text-xl font-semibold mb-4"></h2>
+        <img id="previewImg" class="w-full rounded-md" alt="Video Preview">
+    </div>
+    <div id="loading" class="hidden flex justify-center items-center mt-4">
+        <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-blue-500"></div>
+    </div>
+
+    <div id="formats" class="mt-4"></div>
+
+    <div id="progress-container" class="hidden w-full bg-gray-200 rounded-full mt-4">
+        <div id="progress-bar" class="h-2 bg-green-500 rounded-full transition-all duration-300"
+             style="width: 0%"></div>
+    </div>
+    <p id="status-text" class="text-center text-gray-600 hidden mt-2">Скачивание...</p>
+</div>
+
+<script>
+    const apiUrl = window.location.origin;
+
+    async function fetchFormats() {
+        const url = document.getElementById('videoUrl').value;
+        if (!url) return alert('Please enter a video URL');
+
+        const videoTitle = document.getElementById('videoTitle');
+        const previewTag = document.getElementById('previewImg');
+
+        document.getElementById('videoPreview').classList.add('hidden');
+        document.getElementById("loading").classList.remove("hidden");
+        document.getElementById("formats").innerHTML = ""; // Очищаем прошлые результаты
+
+        const response = await fetch(`${apiUrl}/api/get-formats?url=${url}`, {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'},
+        });
+
+        const data = await response.json();
+        const formatsDiv = document.getElementById('formats');
+        formatsDiv.innerHTML = '';
+        videoTitle.textContent = data.title;
+        previewTag.src = data.preview_url;
+
+        data.formats.reverse().forEach(format => {
+            const btn = document.createElement('button');
+            btn.className = 'w-full bg-green-500 text-white p-2 my-1 rounded-md hover:bg-green-600';
+
+            btn.textContent = format.filesize ? `${format.quality} - ${formatFileSize(format.filesize)}` : format.quality;
+
+
+            btn.onclick = () => {
+                // window.location.href = `${apiUrl}/api/download-video?url=${url}&audio_format_id=${format.audio_format_id}&video_format_id=${format.video_format_id}`;
+                startDownload(url, format.video_format_id, format.audio_format_id, btn);
+            }
+            formatsDiv.appendChild(btn);
+
+        });
+
+        document.getElementById('videoPreview').classList.remove('hidden');
+        document.getElementById("loading").classList.add("hidden");
+    }
+
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return "0 B";
+        const sizes = ["B", "KB", "MB", "GB", "TB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return (bytes / Math.pow(1024, i)).toFixed(2) + " " + sizes[i];
+    }
+
+    async function startDownload(url, videoFormatId, audioFormatId, btn) {
+        const oldTextBtn = btn.textContent;
+
+        btn.textContent = "Подготовка...";
+        btn.classList.add("bg-yellow-500", "animate-pulse");
+        btn.classList.remove("bg-green-500", "hover:bg-green-600");
+
+        document.getElementById("progress-container").classList.remove("hidden");
+        document.getElementById("status-text").classList.remove("hidden");
+        document.getElementById("progress-bar").style.width = "0%";
+
+        const response = await fetch(`${apiUrl}/api/start-download`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({url, video_format_id: videoFormatId, audio_format_id: audioFormatId})
+        });
+
+        const data = await response.json();
+        const taskId = data.task_id;
+
+        checkDownloadStatus(taskId, btn, videoFormatId, audioFormatId, oldTextBtn);
+    }
+
+
+    async function checkDownloadStatus(taskId, btn, videoFormatId, audioFormatId, oldTextBtn) {
+        let progress = 0;
+        let status = "pending";
+
+        while (status !== "completed" && status !== "failed") {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const response = await fetch(`${apiUrl}/api/download-status/${taskId}`);
+            const data = await response.json();
+            console.log(data);
+            status = data.status;
+
+            if (status === "pending") {
+                console.log(data.percent)
+                progress = data.percent;
+                document.getElementById("progress-bar").style.width = `${progress}`;
+
+                document.getElementById("status-text").innerText =
+                    progress ? `Скачивание... (${progress})` : "Подготовка...";
+
+            }
+        }
+
+        if (status === "completed") {
+            document.getElementById("progress-bar").style.width = "100%";
+            document.getElementById("status-text").innerText = "Готово! Начинаем загрузку...";
+
+            // Меняем кнопку на скачивание
+            btn.classList.remove("bg-yellow-500", "animate-pulse");
+            btn.classList.add("bg-blue-500", "hover:bg-blue-600");
+            btn.textContent = "Скачать";
+            btn.onclick = async () => {
+                await downloadFile(taskId);
+                // Возвращаем кнопку в исходное состояние после загрузки
+                btn.classList.remove("bg-blue-500", "hover:bg-blue-600");
+                btn.classList.add("bg-green-500", "hover:bg-green-600");
+                btn.textContent = `${oldTextBtn}`;
+                document.getElementById("progress-container").classList.add("hidden");
+                document.getElementById("status-text").classList.add("hidden");
+                btn.onclick = () => startDownload(document.getElementById('videoUrl').value, videoFormatId, audioFormatId, btn);
+            };
+        } else {
+            document.getElementById("status-text").innerText = "Ошибка скачивания!";
+            document.getElementById("progress-container").classList.add("hidden");
+        }
+    }
+
+    async function downloadFile(taskId) {
+        const link = document.createElement("a");
+        link.href = `${apiUrl}/api/get-video/${taskId}`;
+        link.download = "video.mp4";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+
+</script>
+
+{% endblock %}
+
+

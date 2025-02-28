@@ -1,0 +1,6 @@
+pydantic
+fastapi
+pydantic-settings
+uvicorn
+yt_dlp
+jinja2

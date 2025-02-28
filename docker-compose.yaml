@@ -1,10 +1,10 @@
 services:
-  downloader_vide:
+  downloader_video:
     restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
-    image: downloader_vide:latest
+    image: downloader_video:latest
     ports:
       - "8084:80"
     volumes:

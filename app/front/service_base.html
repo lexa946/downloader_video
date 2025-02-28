@@ -112,11 +112,9 @@
             await new Promise(resolve => setTimeout(resolve, 2000));
             const response = await fetch(`${apiUrl}/api/download-status/${taskId}`);
             const data = await response.json();
-            console.log(data);
             status = data.status;
 
             if (status === "pending") {
-                console.log(data.percent)
                 progress = data.percent;
                 document.getElementById("progress-bar").style.width = `${progress}`;
 

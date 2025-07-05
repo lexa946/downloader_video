@@ -1,6 +1,7 @@
 import asyncio
 import platform
 import uuid
+from concurrent.futures import ProcessPoolExecutor
 
 from pathlib import Path
 from logging import getLogger
@@ -13,7 +14,7 @@ from starlette.responses import StreamingResponse
 
 from app.config import settings
 from app.schemas.main import SVideoResponse, SVideoRequest, SVideoDownload
-from app.utils.main import get_formats
+from app.utils.helpers import get_formats
 
 router = APIRouter(prefix="/api", tags=["Service"])
 
@@ -46,12 +47,23 @@ async def get_video_formats(video: Annotated[SVideoRequest, Depends()]) -> SVide
 async def download_video_task(task_id: str, download_video: SVideoDownload):
     loop = asyncio.get_running_loop()
 
-
-    ydl_opts = {'concurrent_fragments': 3, 'outtmpl': f"{settings.DOWNLOAD_FOLDER}/"
-                                                      f"%(uploader)s/{download_video.video_format_id}_"
-                                                      f"%(upload_date>%Y-%m-%d)s_%(uploader)s#%(title)s.%(ext)s",
-                'merge_output_format': 'mp4', 'noplaylist': True, 'nocheckcertificate': True, 'quiet': True,
-                'ratelimit': 25000000, 'format': download_video.video_format_id}
+    ydl_opts = {
+        'concurrent_fragments': 16,
+        'outtmpl': f"{settings.DOWNLOAD_FOLDER}/"
+                   f"%(uploader)s/"
+                   f"{download_video.video_format_id}_%(upload_date>%Y-%m-%d)s_%(uploader)s#%(title)s.%(ext)s",
+        'merge_output_format': 'mp4',
+        'noplaylist': True,
+        'nocheckcertificate': True,
+        'quiet': True,
+        'throttled_rate': '500K',
+        'socket_timeout': 30,
+        'extract_flat': True,
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        },
+        'format': download_video.video_format_id,
+    }
 
     if download_video.audio_format_id:
         ydl_opts['format'] = ydl_opts['format'] + "+" + download_video.audio_format_id
@@ -65,10 +77,10 @@ async def download_video_task(task_id: str, download_video: SVideoDownload):
     ydl_opts['progress_hooks'] = [post_process_hook]
 
     ydl = yt_dlp.YoutubeDL(ydl_opts)
-    ydl.save_console_title()
 
     def download():
         return ydl.extract_info(download_video.url, download=True)
+
     try:
         info = await loop.run_in_executor(None, download)
         filename = Path(ydl.prepare_filename(info))
@@ -89,6 +101,7 @@ async def stream_file(file_path: Path, chunk_size: int = 1024 * 1024):
         await asyncio.sleep(1)
         file_path.unlink()
         LOG.info(f"Файл {file_path} удален.")
+
 
 @router.post("/start-download")
 async def start_download(request: SVideoDownload, background_tasks: BackgroundTasks):

@@ -61,7 +61,7 @@
 
             btn.onclick = () => {
                 // window.location.href = `${apiUrl}/api/download-video?url=${url}&audio_format_id=${format.audio_format_id}&video_format_id=${format.video_format_id}`;
-                startDownload(url, format.video_format_id, btn);
+                startDownload(url, format.video_format_id, format.audio_format_id, btn);
             }
             formatsDiv.appendChild(btn);
 
@@ -71,7 +71,7 @@
         document.getElementById("loading").classList.add("hidden");
     }
 
-    async function startDownload(url, videoFormatId, btn) {
+    async function startDownload(url, videoFormatId, audioFormatId, btn) {
         const oldTextBtn = btn.textContent;
 
         btn.textContent = "Подготовка...";
@@ -85,17 +85,17 @@
         const response = await fetch(`${apiUrl}/api/start-download`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({url, video_format_id: videoFormatId})
+            body: JSON.stringify({url, video_format_id: videoFormatId, audio_format_id: audioFormatId})
         });
 
         const data = await response.json();
         const taskId = data.task_id;
 
-        checkDownloadStatus(taskId, btn, videoFormatId, oldTextBtn);
+        checkDownloadStatus(taskId, btn, videoFormatId, audioFormatId, oldTextBtn);
     }
 
 
-    async function checkDownloadStatus(taskId, btn, videoFormatId, oldTextBtn) {
+    async function checkDownloadStatus(taskId, btn, videoFormatId, audioFormatId, oldTextBtn) {
         let progress = 0;
         let status = "Pending";
 
@@ -131,7 +131,7 @@
                 btn.textContent = `${oldTextBtn}`;
                 document.getElementById("progress-container").classList.add("hidden");
                 document.getElementById("status-text").classList.add("hidden");
-                btn.onclick = () => startDownload(document.getElementById('videoUrl').value, videoFormatId, btn);
+                btn.onclick = () => startDownload(document.getElementById('videoUrl').value, videoFormatId, audioFormatId, btn);
             };
         } else {
             document.getElementById("status-text").innerText = "Ошибка скачивания!";

@@ -12,11 +12,13 @@ class SVideo(BaseModel):
     quality: str
     filesize: Optional[float] = field(default=0)
     video_format_id: int
+    audio_format_id: int
 
 
 class SVideoDownload(BaseModel):
     url: str
     video_format_id: int
+    audio_format_id: int
 
 
 class SVideoResponse(BaseModel):

@@ -4,7 +4,7 @@
 <div class="bg-white p-6 rounded-lg shadow-lg w-96">
     <h1 class="text-xl font-semibold mt-4 mb-4">Video Downloader</h1>
     <p class="text-xl font-semibold mb-4">
-        Вы можете скачивать видео с Youtube, Instagram, VK, OK, Tik-Tok.
+        Вы можете скачивать видео с Youtube.
     </p>
     <input id="videoUrl" type="text" placeholder="Введите ссылку на видео" class="w-full p-2 border rounded-md">
     <button onclick="fetchFormats()" class="mt-2 w-full bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">
@@ -57,12 +57,11 @@
             const btn = document.createElement('button');
             btn.className = 'w-full bg-green-500 text-white p-2 my-1 rounded-md hover:bg-green-600';
 
-            btn.textContent = format.filesize ? `${format.quality} - ${formatFileSize(format.filesize)}` : format.quality;
-
+            btn.textContent = format.filesize ? `${format.quality} - ${format.filesize} MB` : format.quality;
 
             btn.onclick = () => {
                 // window.location.href = `${apiUrl}/api/download-video?url=${url}&audio_format_id=${format.audio_format_id}&video_format_id=${format.video_format_id}`;
-                startDownload(url, format.video_format_id, format.audio_format_id, btn);
+                startDownload(url, format.video_format_id, btn);
             }
             formatsDiv.appendChild(btn);
 
@@ -72,15 +71,7 @@
         document.getElementById("loading").classList.add("hidden");
     }
 
-
-    function formatFileSize(bytes) {
-        if (bytes === 0) return "0 B";
-        const sizes = ["B", "KB", "MB", "GB", "TB"];
-        const i = Math.floor(Math.log(bytes) / Math.log(1024));
-        return (bytes / Math.pow(1024, i)).toFixed(2) + " " + sizes[i];
-    }
-
-    async function startDownload(url, videoFormatId, audioFormatId, btn) {
+    async function startDownload(url, videoFormatId, btn) {
         const oldTextBtn = btn.textContent;
 
         btn.textContent = "Подготовка...";
@@ -94,37 +85,37 @@
         const response = await fetch(`${apiUrl}/api/start-download`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({url, video_format_id: videoFormatId, audio_format_id: audioFormatId})
+            body: JSON.stringify({url, video_format_id: videoFormatId})
         });
 
         const data = await response.json();
         const taskId = data.task_id;
 
-        checkDownloadStatus(taskId, btn, videoFormatId, audioFormatId, oldTextBtn);
+        checkDownloadStatus(taskId, btn, videoFormatId, oldTextBtn);
     }
 
 
-    async function checkDownloadStatus(taskId, btn, videoFormatId, audioFormatId, oldTextBtn) {
+    async function checkDownloadStatus(taskId, btn, videoFormatId, oldTextBtn) {
         let progress = 0;
-        let status = "pending";
+        let status = "Pending";
 
-        while (status !== "completed" && status !== "failed") {
+        while (status !== "Completed" && status !== "Failed") {
             await new Promise(resolve => setTimeout(resolve, 2000));
             const response = await fetch(`${apiUrl}/api/download-status/${taskId}`);
             const data = await response.json();
             status = data.status;
 
-            if (status === "pending") {
+            if (status === "Pending") {
                 progress = data.percent;
-                document.getElementById("progress-bar").style.width = `${progress}`;
+                document.getElementById("progress-bar").style.width = `${progress}%`;
 
                 document.getElementById("status-text").innerText =
-                    progress ? `Скачивание... (${progress})` : "Подготовка...";
+                    progress ? `Скачивание... (${progress}%)` : "Подготовка...";
 
             }
         }
 
-        if (status === "completed") {
+        if (status === "Completed") {
             document.getElementById("progress-bar").style.width = "100%";
             document.getElementById("status-text").innerText = "Готово! Начинаем загрузку...";
 
@@ -140,7 +131,7 @@
                 btn.textContent = `${oldTextBtn}`;
                 document.getElementById("progress-container").classList.add("hidden");
                 document.getElementById("status-text").classList.add("hidden");
-                btn.onclick = () => startDownload(document.getElementById('videoUrl').value, videoFormatId, audioFormatId, btn);
+                btn.onclick = () => startDownload(document.getElementById('videoUrl').value, videoFormatId, btn);
             };
         } else {
             document.getElementById("status-text").innerText = "Ошибка скачивания!";

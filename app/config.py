@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     DOWNLOAD_FOLDER: str
     FFMPEG_PATH: str
+    MIN_VIDEO_HEIGHT: int
 
     @model_validator(mode="before")
     def set_more_field(cls, values):

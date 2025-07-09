@@ -1,27 +1,44 @@
+from functools import wraps
+
+from fastapi import HTTPException
+from pytube.request import stream
+from pytubefix import Stream
+from starlette import status
+
+from app.config import settings
+from app.routers.service import DOWNLOAD_TASKS
 from app.schemas.main import SVideo
 
-def get_formats(video_info):
-    formats_all = video_info.get('formats', [])
-    video_formats = {}
-    audio_format_id = ""
-    min_height = 144
+
+def format_filter(stream: Stream):
+    return (
+        stream.type == "video" and
+        stream.video_codec.startswith("avc1") and
+        stream.height > settings.MIN_VIDEO_HEIGHT
+    )
 
 
-    for format in formats_all:
-        if format['resolution'] == 'audio only':
-            audio_format_id = format['format_id']
-            continue
-        if "height" not in format or not format['height'] or format['height'] < min_height:
-            continue
-        video_formats[f"{format["height"]}p"] = format
-
+def get_formats(streams: list[Stream]):
+    formats_all = list(filter(format_filter, streams))
     available_formats = [
         SVideo(
             **{
-                "quality": key,
-                "video_format_id": format['format_id'],
-                "audio_format_id": audio_format_id,
+                "quality": v_format.resolution,
+                "video_format_id": v_format.itag,
+                "filesize": v_format.filesize_mb
             }
-        ) for key, format in video_formats.items()
+        ) for v_format in formats_all
     ]
     return available_formats
+
+
+def check_task_id(func):
+    @wraps(func)
+    async def wrapper(task_id):
+        if task_id not in DOWNLOAD_TASKS:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Task with id {task_id} not found."
+            )
+        return await func(task_id)
+    return wrapper

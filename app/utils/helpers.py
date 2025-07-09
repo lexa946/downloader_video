@@ -1,7 +1,6 @@
 from functools import wraps
 
 from fastapi import HTTPException
-from pytube.request import stream
 from pytubefix import Stream
 from starlette import status
 

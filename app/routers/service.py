@@ -11,7 +11,7 @@ from app.models.status import VideoDownloadStatus
 from app.models.storage import DownloadTask, DOWNLOAD_TASKS
 from app.process.video import download_video_task, stream_file, get_available_formats
 from app.schemas.main import SVideoResponse, SVideoRequest, SVideoDownload, SVideoStatus
-from app.utils.helpers import check_task_id
+from app.utils.validators_utils import check_task_id
 
 router = APIRouter(prefix="/api", tags=["Service"])
 

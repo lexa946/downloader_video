@@ -1,13 +1,17 @@
+import asyncio
 import platform
 import subprocess
-from functools import wraps
+from uuid import uuid4
 
-from fastapi import HTTPException
+import aiohttp
+from Crypto.Util.py3compat import BytesIO
+
 from pytubefix import Stream
-from starlette import status
+
 
 from app.config import settings
-from app.routers.service import DOWNLOAD_TASKS
+from app.s3.client import s3_client
+
 from app.schemas.main import SVideo
 
 
@@ -41,16 +45,16 @@ def get_formats(streams: list[Stream], audio_stream: Stream):
     return available_formats
 
 
-def check_task_id(func):
-    @wraps(func)
-    async def wrapper(task_id):
-        if task_id not in DOWNLOAD_TASKS:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Task with id {task_id} not found."
+async def save_preview_on_s3(preview_url: str, video_title: str) -> str:
+    video_title = video_title.strip(" ?./\|")
+    async with aiohttp.ClientSession() as session:
+        async with session.get(preview_url) as resp:
+            content = await resp.content.read()
+            return s3_client.upload_file(
+                f"{str(uuid4())}_{video_title}.png",
+                BytesIO(content),
+                len(content)
             )
-        return await func(task_id)
-    return wrapper
 
 
 def combine_audio_and_video(video_path, audio_path, output_path):

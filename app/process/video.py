@@ -8,7 +8,7 @@ from app.config import settings
 from app.models.status import VideoDownloadStatus
 from app.models.storage import DOWNLOAD_TASKS, DownloadTask
 from app.schemas.main import SVideoDownload, SVideoResponse
-from app.utils.helpers import get_formats, combine_audio_and_video
+from app.utils.video_utils import get_formats, combine_audio_and_video, save_preview_on_s3
 
 LOG = getLogger()
 
@@ -28,10 +28,12 @@ async def get_available_formats(url):
 
     available_formats = await asyncio.to_thread(get_formats, streams, audio)
 
+    preview_url = await save_preview_on_s3(yt.thumbnail_url, yt.title)
+
     return SVideoResponse(
         url=url,
         title=yt.title,
-        preview_url=yt.thumbnail_url,
+        preview_url=preview_url,
         formats=available_formats,
     )
 

@@ -71,6 +71,7 @@ async def get_downloaded_video(task_id: Annotated[str, Path()]) -> StreamingResp
         stream_file(task.filepath),
         media_type="video/mp4",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}.mp4"
+            "Content-Disposition": f"attachment; filename={filename}.mp4",
+            "Content-Length": str(task.filepath.stat().st_size),
         }
     )

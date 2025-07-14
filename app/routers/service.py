@@ -2,6 +2,7 @@ import uuid
 
 from logging import getLogger
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Path
 from fastapi.responses import StreamingResponse
@@ -64,9 +65,12 @@ async def get_downloaded_video(task_id: Annotated[str, Path()]) -> StreamingResp
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The file does not exist."
         )
+    filename = quote(task.filepath.stem)[44:]
 
     return StreamingResponse(
         stream_file(task.filepath),
         media_type="video/mp4",
-        headers={"Content-Disposition": "attachment; filename=video.mp4"}
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}.mp4"
+        }
     )

@@ -1,4 +1,3 @@
-import asyncio
 import platform
 import subprocess
 from uuid import uuid4
@@ -46,7 +45,7 @@ def get_formats(streams: list[Stream], audio_stream: Stream):
 
 
 async def save_preview_on_s3(preview_url: str, video_title: str) -> str:
-    video_title = video_title.strip(" ?./\|")
+    video_title = video_title.strip(" ?./\\|")
     async with aiohttp.ClientSession() as session:
         async with session.get(preview_url) as resp:
             content = await resp.content.read()

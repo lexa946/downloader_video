@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from logging import getLogger
 from pathlib import Path
 
@@ -41,6 +42,8 @@ async def get_available_formats(url):
 async def download_video_task(task_id: str, download_video: SVideoDownload):
     task: DownloadTask = DOWNLOAD_TASKS[task_id]
     yt = YouTube(download_video.url)
+    uuid_video = str(uuid.uuid4())
+
     download_path = Path(settings.DOWNLOAD_FOLDER) / yt.author
 
     def post_process_hook(stream_: Stream, chunk: bytes, bytes_remaining: int):
@@ -50,16 +53,21 @@ async def download_video_task(task_id: str, download_video: SVideoDownload):
 
     yt.register_on_progress_callback(post_process_hook)
     try:
+        task.video_status.description = "Downloading video track"
+
         video_path = Path(await asyncio.to_thread(
             yt.streams.get_by_itag(download_video.video_format_id).download,
             output_path=download_path.as_posix(),
-            filename_prefix="video_"
+            filename_prefix=f"{uuid_video}_video_"
         ))
+
+        task.video_status.description = "Downloading audio track"
         audio_path = Path(await asyncio.to_thread(
             yt.streams.get_by_itag(download_video.audio_format_id).download,
             output_path=download_path.as_posix(),
-            filename_prefix="audio_"
+            filename_prefix=f"{uuid_video}_audio_"
         ))
+        task.video_status.description = "Merging tracks"
         out_path = video_path.with_name(video_path.stem + "_out.mp4")
         await asyncio.to_thread(combine_audio_and_video,
                                 video_path.as_posix(),
@@ -69,6 +77,7 @@ async def download_video_task(task_id: str, download_video: SVideoDownload):
         audio_path.unlink(missing_ok=True)
         video_path.unlink(missing_ok=True)
         task.video_status.status = VideoDownloadStatus.COMPLETED
+        task.video_status.description = VideoDownloadStatus.COMPLETED
         task.filepath = out_path
 
     except Exception as e:

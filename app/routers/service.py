@@ -8,27 +8,33 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Path
 from fastapi.responses import StreamingResponse
 from starlette import status
 
+from app.models.services import VideoServices
 from app.models.status import VideoDownloadStatus
 from app.models.storage import DownloadTask, DOWNLOAD_TASKS
-from app.process.video import download_video_task, stream_file, get_available_formats
-from app.schemas.main import SVideoResponse, SVideoRequest, SVideoDownload, SVideoStatus
+from app.schemas.main import SVideoFormatsResponse, SVideoRequest, SVideoDownload, SVideoStatus
 from app.utils.validators_utils import check_task_id
+from app.utils.video_utils import stream_file
 
 router = APIRouter(prefix="/api", tags=["Service"])
 
 LOG = getLogger()
 
-
-
 @router.get("/get-formats")
-async def get_video_formats(video: Annotated[SVideoRequest, Depends()]) -> SVideoResponse:
+
+async def get_video_formats(video: Annotated[SVideoRequest, Depends()]) -> SVideoFormatsResponse:
     """Получаем все доступные форматы видео"""
-    available_formats = await get_available_formats(video.url)
+
+    service = VideoServices.get_service(video.url)
+    available_formats = await service.parser(video.url).get_formats()
+    if not available_formats:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Can't find formats."
+        )
     return available_formats
 
 
-
-@router.post("/start-download")
+@router.post("/start-download", response_model=SVideoStatus)
 async def start_download(request: SVideoDownload, background_tasks: BackgroundTasks) -> SVideoStatus:
     """Запускает процесс скачивания"""
     task_id = str(uuid.uuid4())
@@ -37,7 +43,9 @@ async def start_download(request: SVideoDownload, background_tasks: BackgroundTa
         status=VideoDownloadStatus.PENDING,
     )
     DOWNLOAD_TASKS[task_id] = DownloadTask(video_status)
-    background_tasks.add_task(download_video_task, task_id, request)
+
+    service = VideoServices.get_service(request.url)
+    background_tasks.add_task(service.parser(request.url).download, task_id, request)
     return video_status
 
 
@@ -65,7 +73,7 @@ async def get_downloaded_video(task_id: Annotated[str, Path()]) -> StreamingResp
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The file does not exist."
         )
-    filename = quote(task.filepath.stem)[44:]
+    filename = quote(task.filepath.stem)[43:]
 
     return StreamingResponse(
         stream_file(task.filepath),

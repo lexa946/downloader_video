@@ -1,18 +1,20 @@
+import asyncio
 import platform
 import subprocess
+from logging import getLogger
+from pathlib import Path
 from uuid import uuid4
 
 import aiohttp
 from Crypto.Util.py3compat import BytesIO
 
-from pytubefix import Stream
+
 
 
 from app.config import settings
 from app.s3.client import s3_client
 
-from app.schemas.main import SVideo
-
+LOG = getLogger()
 
 
 if platform.system() == 'Windows':
@@ -21,27 +23,16 @@ else:
     FFMPEG = "ffmpeg"
 
 
-def format_filter(stream: Stream):
-    return (
-        stream.type == "video" and
-        stream.video_codec.startswith("avc1") and
-        stream.height > settings.MIN_VIDEO_HEIGHT
-    )
 
-
-def get_formats(streams: list[Stream], audio_stream: Stream):
-    formats_all = list(filter(format_filter, streams))
-    available_formats = [
-        SVideo(
-            **{
-                "quality": v_format.resolution,
-                "video_format_id": v_format.itag,
-                "audio_format_id": audio_stream.itag,
-                "filesize": round(v_format.filesize_mb + audio_stream.filesize_mb/2, 2),
-            }
-        ) for v_format in formats_all
-    ]
-    return available_formats
+async def stream_file(file_path: Path, chunk_size: int = 1024 * 1024):
+    try:
+        with file_path.open("rb") as file:
+            while chunk := file.read(chunk_size):
+                yield chunk
+    finally:
+        await asyncio.sleep(1)
+        file_path.unlink()
+        LOG.info(f"Файл {file_path} удален.")
 
 
 async def save_preview_on_s3(preview_url: str, video_title: str) -> str:

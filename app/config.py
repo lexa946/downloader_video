@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     S3_ENDPOINT_URL: str
     S3_BUCKET_NAME: str
 
+    INSTAGRAM_LOGIN: str
+    INSTAGRAM_PASSWORD: str
+
     @model_validator(mode="before")
     def set_more_field(cls, values):
         os.makedirs(values['DOWNLOAD_FOLDER'], exist_ok=True)

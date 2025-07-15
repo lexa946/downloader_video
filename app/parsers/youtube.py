@@ -1,4 +1,5 @@
 import asyncio
+from datetime import timedelta
 from pathlib import Path
 
 from pytubefix import Stream, YouTube, StreamQuery
@@ -84,7 +85,7 @@ class YouTubeParser(BaseParser):
         audio = await asyncio.to_thread(self._get_audio_stream, streams)
 
         preview_url = await save_preview_on_s3(self._yt.thumbnail_url, self._yt.title)
-
+        duration = timedelta(milliseconds=int(audio.durationMs)).seconds
         available_formats = [
             SVideo(
                 **{
@@ -99,5 +100,6 @@ class YouTubeParser(BaseParser):
             url=self.url,
             title=self._yt.title,
             preview_url=preview_url,
+            duration=duration,
             formats=available_formats,
         )

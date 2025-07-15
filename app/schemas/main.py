@@ -26,6 +26,7 @@ class SVideoFormatsResponse(BaseModel):
     title: str
     formats: list[SVideo]
     preview_url: Optional[str] = field(default=None)
+    duration: Optional[int] = field(default=None)
 
 
 class SVideoStatus(BaseModel):

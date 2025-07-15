@@ -96,6 +96,7 @@ class InstagramParser(BaseParser):
             url=self.url,
             title=info['title'],
             preview_url=info['thumbnail'],
+            duratin=int(info['duration']),
             formats=available_formats,
         )
 

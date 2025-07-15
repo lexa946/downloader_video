@@ -9,6 +9,7 @@ from app.models.status import VideoDownloadStatus
 from app.models.storage import DOWNLOAD_TASKS, DownloadTask
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoFormatsResponse, SVideoDownload, SVideo
+from app.utils.video_utils import save_preview_on_s3
 
 
 class InstagramParser(BaseParser):
@@ -81,6 +82,7 @@ class InstagramParser(BaseParser):
         info = await asyncio.to_thread(extract_info)
         audio_format = self._get_audio_format(info.get("formats", []))
 
+        preview_url = await save_preview_on_s3(info['thumbnail'], info['title'])
 
         available_formats = [
             SVideo(
@@ -95,7 +97,7 @@ class InstagramParser(BaseParser):
         return SVideoFormatsResponse(
             url=self.url,
             title=info['title'],
-            preview_url=info['thumbnail'],
+            preview_url=preview_url,
             duratin=int(info['duration']),
             formats=available_formats,
         )

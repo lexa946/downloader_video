@@ -36,9 +36,7 @@ class InstagramVideo:
         video_height = items[0]['video_versions'][0]['height']
         video_quality = f"{video_width}x{video_height}"
 
-        video_preview_url = next(
-            filter(lambda item: item['height'] == video_height, items[0]['image_versions2']['candidates']), {}).get(
-            "url", "")
+        video_preview_url = items[0]['image_versions2']['candidates'][0]['url']
         video_author = items[0]['user']['username']
         video_title = f"video_by_{video_author}.mp4"
 

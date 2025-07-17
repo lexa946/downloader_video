@@ -6,7 +6,6 @@ from uuid import uuid4
 import aiohttp
 from attr import dataclass
 from bs4 import BeautifulSoup
-from imageio.config.plugins import config
 
 from app.config import settings
 from app.models.status import VideoDownloadStatus

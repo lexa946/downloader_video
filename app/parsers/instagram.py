@@ -4,9 +4,9 @@ from pathlib import Path
 from uuid import uuid4
 
 import aiohttp
-from aiohttp import ClientResponse
 from attr import dataclass
 from bs4 import BeautifulSoup
+from imageio.config.plugins import config
 
 from app.config import settings
 from app.models.status import VideoDownloadStatus
@@ -60,7 +60,10 @@ class InstagramParser(BaseParser):
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 YaBrowser/25.6.0.0 Safari/537.36",
     }
-    cookies = json.loads(Path("cookies.json").read_text())
+    cookies = {
+        "csrftoken": settings.INSTAGRAM_CSRFTOKEN,
+        "sessionid": settings.INSTAGRAM_SESSIONID,
+    }
 
     def __init__(self, url):
         self.url = url

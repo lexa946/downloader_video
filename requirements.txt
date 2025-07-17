@@ -10,3 +10,6 @@ httpx
 pytubefix
 minio
 aiohttp
+aiofiles
+lxml
+beautifulsoup4

@@ -5,4 +5,4 @@ download
 ffmpeg
 test.*
 
-cookie.txt
+cookie*

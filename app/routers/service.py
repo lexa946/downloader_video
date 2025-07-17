@@ -34,7 +34,7 @@ async def get_video_formats(video: Annotated[SVideoRequest, Depends()]) -> SVide
     return available_formats
 
 
-@router.post("/start-download", response_model=SVideoStatus)
+@router.post("/start-download")
 async def start_download(request: SVideoDownload, background_tasks: BackgroundTasks) -> SVideoStatus:
     """Запускает процесс скачивания"""
     task_id = str(uuid.uuid4())

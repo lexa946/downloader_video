@@ -113,7 +113,7 @@ class InstagramParser(BaseParser):
 
         video = self._parse_video_attributes(response_text)
 
-        preview_url = await save_preview_on_s3(video.preview_url, str(uuid4()) + "_" + video.title)
+        preview_url = await save_preview_on_s3(video.preview_url, video.title,  video.author)
 
         available_formats = [
             SVideo(
@@ -128,6 +128,7 @@ class InstagramParser(BaseParser):
         return SVideoFormatsResponse(
             url=self.url,
             title=video.title,
+            author=video.author,
             preview_url=preview_url,
             duratin=video.duration,
             formats=available_formats,

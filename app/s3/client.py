@@ -27,24 +27,38 @@ class S3Client:
         if not self.client.bucket_exists(bucket_name):
             self.client.make_bucket(bucket_name)
 
-    def upload_file(self, key: str, body: BinaryIO, size:int) -> str:
+    def _repair_key(self, key: str) -> str:
+        new_key_list = []
+        for char_ in key:
+            if char_.isalnum():
+                new_key_list.append(char_)
+            elif char_.isspace():
+                new_key_list.append("_")
+        return "".join(new_key_list)
+
+    def upload_file(self, key: str, body: BinaryIO, size:int, folder: str = None, extension: str = "") -> str:
         """Загружает файл в Minio и возвращает его URL"""
+
+        object_name = self._repair_key(key) + extension
+        if folder:
+            object_name = self._repair_key(folder) + "/" + object_name
+
         try:
-            self.client.put_object(
+            result = self.client.put_object(
                 bucket_name=self.bucket_name,
-                object_name=key,
+                object_name=object_name,
                 data=body,
                 length=size,
             )
-            return f"{self.config['endpoint_url']}/{self.bucket_name}/{key}"
+            return f"{self.config['endpoint_url']}/{self.bucket_name}/{result.object_name}"
         except S3Error as err:
             print(f"Ошибка при загрузке файла: {err}")
-            return None
+            return ""
 
     def get_file(self, key):
         """Получает файл из Minio"""
         try:
-            response = self.client.get_object(self.bucket_name, key)
+            response = self.client.get_object(self.bucket_name, self._repair_key(key))
             return response.read()  # Читаем содержимое файла
         except S3Error as err:
             print(f"Ошибка при получении файла: {err}")

@@ -37,25 +37,27 @@ class YouTubeParser(BaseParser):
                 output_path=download_path.as_posix(),
                 filename_prefix=f"{task_id}_video_"
             ))
+            if download_video.audio_format_id != download_video.video_format_id:
+                task.video_status.description = "Downloading audio track"
+                audio_path = Path(await asyncio.to_thread(
+                    self._yt.streams.get_by_itag(download_video.audio_format_id).download,
+                    output_path=download_path.as_posix(),
+                    filename_prefix=f"{task_id}_audio_"
+                ))
+                task.video_status.description = "Merging tracks"
+                out_path = video_path.with_name(video_path.stem + "_out.mp4")
+                await asyncio.to_thread(combine_audio_and_video,
+                                        video_path.as_posix(),
+                                        audio_path.as_posix(),
+                                        out_path.as_posix()
+                                        )
+                audio_path.unlink(missing_ok=True)
+                video_path.unlink(missing_ok=True)
+                video_path = out_path
 
-            task.video_status.description = "Downloading audio track"
-            audio_path = Path(await asyncio.to_thread(
-                self._yt.streams.get_by_itag(download_video.audio_format_id).download,
-                output_path=download_path.as_posix(),
-                filename_prefix=f"{task_id}_audio_"
-            ))
-            task.video_status.description = "Merging tracks"
-            out_path = video_path.with_name(video_path.stem + "_out.mp4")
-            await asyncio.to_thread(combine_audio_and_video,
-                                    video_path.as_posix(),
-                                    audio_path.as_posix(),
-                                    out_path.as_posix()
-                                    )
-            audio_path.unlink(missing_ok=True)
-            video_path.unlink(missing_ok=True)
             task.video_status.status = VideoDownloadStatus.COMPLETED
             task.video_status.description = VideoDownloadStatus.COMPLETED
-            task.filepath = out_path
+            task.filepath = video_path
 
         except Exception as e:
             task.video_status.status = VideoDownloadStatus.ERROR
@@ -84,7 +86,7 @@ class YouTubeParser(BaseParser):
         streams = await asyncio.to_thread(lambda: self._yt.streams.fmt_streams)
         audio = await asyncio.to_thread(self._get_audio_stream, streams)
 
-        preview_url = await save_preview_on_s3(self._yt.thumbnail_url, self._yt.title)
+        preview_url = await save_preview_on_s3(self._yt.thumbnail_url,self._yt.title, self._yt.author)
         duration = timedelta(milliseconds=int(audio.durationMs)).seconds
         available_formats = [
             SVideo(
@@ -102,4 +104,5 @@ class YouTubeParser(BaseParser):
             preview_url=preview_url,
             duration=duration,
             formats=available_formats,
+            author=self._yt.author,
         )

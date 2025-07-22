@@ -35,15 +35,16 @@ async def stream_file(file_path: Path, chunk_size: int = 1024 * 1024):
         LOG.info(f"Файл {file_path} удален.")
 
 
-async def save_preview_on_s3(preview_url: str, video_title: str) -> str:
-    video_title = video_title.strip(" ?./\\|")
+async def save_preview_on_s3(preview_url: str, key: str, folder: str = None) -> str:
     async with aiohttp.ClientSession() as session:
         async with session.get(preview_url) as resp:
             content = await resp.content.read()
             return s3_client.upload_file(
-                f"{str(uuid4())}_{video_title}.png",
+                key,
                 BytesIO(content),
-                len(content)
+                len(content),
+                folder=folder,
+                extension=".png",
             )
 
 

@@ -4,7 +4,7 @@ from starlette import status
 from app.parsers import YouTubeParser, InstagramParser
 
 
-class VideoService:
+class VideoServiceBase:
     name = "VideoService"
     key_words = list()
     parser = None
@@ -14,14 +14,14 @@ class VideoService:
         return any(keyword in url for keyword in cls.key_words)
 
 
-class YoutubeVideoService(VideoService):
+class YoutubeVideoService(VideoServiceBase):
     name = "YouTube"
     key_words = ['youtube', 'youtu.be', 'shorts']
     parser = YouTubeParser
 
 
 
-class InstagramVideoService(VideoService):
+class InstagramVideoService(VideoServiceBase):
     name = "Instagram"
     key_words = ['instagram', 'reels']
     parser = InstagramParser

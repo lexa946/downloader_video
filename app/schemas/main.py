@@ -24,6 +24,7 @@ class SVideoDownload(BaseModel):
 class SVideoFormatsResponse(BaseModel):
     url: str
     title: str
+    author: str
     formats: list[SVideo]
     preview_url: Optional[str] = field(default=None)
     duration: Optional[int] = field(default=None)

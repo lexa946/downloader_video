@@ -1,7 +1,6 @@
 import json
 import aiofiles
 from pathlib import Path
-from uuid import uuid4
 
 import aiohttp
 from attr import dataclass

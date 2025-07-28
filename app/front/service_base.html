@@ -78,7 +78,12 @@
     async function startDownload(url, videoFormatId, audioFormatId, btn) {
         const oldTextBtn = btn.textContent;
 
+        document.querySelectorAll('#formats button').forEach(btn => {
+            btn.disabled = true;
+        });
+        btn.onclick = () => {};
         btn.textContent = "Подготовка...";
+        btn.disabled = false;
         btn.classList.add("bg-yellow-500", "animate-pulse");
         btn.classList.remove("bg-green-500", "hover:bg-green-600");
 
@@ -115,7 +120,6 @@
 
                 document.getElementById("status-text").innerText =
                     progress ? `Скачивание... (${progress}%)` : "Подготовка...";
-
             }
         }
 
@@ -135,6 +139,9 @@
                 btn.textContent = `${oldTextBtn}`;
                 document.getElementById("progress-container").classList.add("hidden");
                 document.getElementById("status-text").classList.add("hidden");
+                document.querySelectorAll('#formats button').forEach(btn => {
+                    btn.disabled = false;
+                });
                 btn.onclick = () => startDownload(document.getElementById('videoUrl').value, videoFormatId, audioFormatId, btn);
             };
         } else {

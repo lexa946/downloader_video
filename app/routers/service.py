@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Path
 from fastapi.responses import StreamingResponse
 from starlette import status
 
-from app.models.services import VideoServices
+from app.models.services import VideoServicesManager
 from app.models.status import VideoDownloadStatus
 from app.models.storage import DownloadTask, DOWNLOAD_TASKS
 from app.schemas.main import SVideoFormatsResponse, SVideoRequest, SVideoDownload, SVideoStatus
@@ -23,7 +23,7 @@ LOG = getLogger()
 async def get_video_formats(video: Annotated[SVideoRequest, Depends()]) -> SVideoFormatsResponse:
     """Получаем все доступные форматы видео"""
 
-    service = VideoServices.get_service(video.url)
+    service = VideoServicesManager.get_service(video.url)
     available_formats = await service.parser(video.url).get_formats()
     if not available_formats:
         raise HTTPException(
@@ -43,7 +43,7 @@ async def start_download(request: SVideoDownload, background_tasks: BackgroundTa
     )
     DOWNLOAD_TASKS[task_id] = DownloadTask(video_status)
 
-    service = VideoServices.get_service(request.url)
+    service = VideoServicesManager.get_service(request.url)
     background_tasks.add_task(service.parser(request.url).download, task_id, request)
     return video_status
 

@@ -2,7 +2,6 @@ pydantic
 fastapi
 pydantic-settings
 uvicorn
-yt_dlp
 jinja2
 pytest
 pytest-asyncio

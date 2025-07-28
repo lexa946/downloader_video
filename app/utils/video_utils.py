@@ -3,13 +3,9 @@ import platform
 import subprocess
 from logging import getLogger
 from pathlib import Path
-from uuid import uuid4
 
 import aiohttp
 from Crypto.Util.py3compat import BytesIO
-
-
-
 
 from app.config import settings
 from app.s3.client import s3_client

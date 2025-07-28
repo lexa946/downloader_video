@@ -3,7 +3,7 @@ import aiofiles
 from pathlib import Path
 
 import aiohttp
-from attr import dataclass
+from dataclasses import dataclass
 from bs4 import BeautifulSoup
 
 from app.config import settings

@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from starlette import status
 
-from app.parsers import YouTubeParser, InstagramParser
+from app.parsers import YouTubeParser, InstagramParser, VkParser
 
 
 class VideoServiceBase:
@@ -20,25 +20,22 @@ class YoutubeVideoService(VideoServiceBase):
     parser = YouTubeParser
 
 
-
 class InstagramVideoService(VideoServiceBase):
     name = "Instagram"
     key_words = ['instagram', 'reels']
     parser = InstagramParser
 
 
-class VideoServices:
-    YOUTUBE = YoutubeVideoService
-    INSTAGRAM = InstagramVideoService
-
-    @classmethod
-    def all(cls):
-        return [cls.YOUTUBE, cls.INSTAGRAM]
+class VkVideoService(VideoServiceBase):
+    name = "VK"
+    key_words = ['vkvideo']
+    parser = VkParser
 
 
+class VideoServicesManager:
     @classmethod
     def get_service(cls, url):
-        for service in VideoServices.all():
+        for service in VideoServiceBase.__subclasses__():
             if service.match_url(url):
                 return service
         raise HTTPException(

@@ -31,6 +31,11 @@
 <script>
     const apiUrl = window.location.origin;
 
+    function bytesToMegabytes(bytes, decimals = 2) {
+        const megabytes = bytes / (1024 * 1024);
+        return Number(megabytes.toFixed(decimals));
+    }
+
     async function fetchFormats() {
         const url = document.getElementById('videoUrl').value;
         if (!url) return alert('Please enter a video URL');
@@ -57,10 +62,9 @@
             const btn = document.createElement('button');
             btn.className = 'w-full bg-green-500 text-white p-2 my-1 rounded-md hover:bg-green-600';
 
-            btn.textContent = format.filesize ? `${format.quality} - ${format.filesize} MB` : format.quality;
+            btn.textContent = format.filesize ? `${format.quality} - ${bytesToMegabytes(format.filesize)} MB` : format.quality;
 
             btn.onclick = () => {
-                // window.location.href = `${apiUrl}/api/download-video?url=${url}&audio_format_id=${format.audio_format_id}&video_format_id=${format.video_format_id}`;
                 startDownload(url, format.video_format_id, format.audio_format_id, btn);
             }
             formatsDiv.appendChild(btn);

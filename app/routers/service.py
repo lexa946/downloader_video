@@ -20,7 +20,6 @@ router = APIRouter(prefix="/api", tags=["Service"])
 LOG = getLogger()
 
 @router.get("/get-formats")
-
 async def get_video_formats(video: Annotated[SVideoRequest, Depends()]) -> SVideoFormatsResponse:
     """Получаем все доступные форматы видео"""
 

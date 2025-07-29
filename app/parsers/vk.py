@@ -170,6 +170,6 @@ class VkParser(BaseParser):
             title=video.title,
             author=video.author,
             preview_url=video.preview_url,
-            duratin=video.duration,
+            duration=video.duration,
             formats=available_formats,
         )

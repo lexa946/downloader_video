@@ -129,6 +129,6 @@ class InstagramParser(BaseParser):
             title=video.title,
             author=video.author,
             preview_url=preview_url,
-            duratin=video.duration,
+            duration=video.duration,
             formats=available_formats,
         )

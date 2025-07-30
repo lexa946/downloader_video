@@ -10,7 +10,7 @@ from app.config import settings
 from app.models.status import VideoDownloadStatus
 from app.models.storage import DOWNLOAD_TASKS, DownloadTask
 from app.parsers.base import BaseParser
-from app.schemas.main import SVideoFormatsResponse, SVideoDownload, SVideo
+from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
 from app.utils.helpers import remove_all_spec_chars
 
 
@@ -149,13 +149,13 @@ class VkParser(BaseParser):
         task.video_status.description = VideoDownloadStatus.COMPLETED
         task.filepath = download_path
 
-    async def get_formats(self) -> SVideoFormatsResponse:
+    async def get_formats(self) -> SVideoResponse:
         async with aiohttp.ClientSession(headers=self._headers) as session:
             response_json = await self._get_video_info(session)
         video = VkVideo.from_json(response_json)
 
         available_formats = [
-            SVideo(
+            SVideoFormat(
                 **{
                     "quality": f"{quality}p",
                     "video_format_id": quality,
@@ -165,7 +165,7 @@ class VkParser(BaseParser):
             )
             for quality, url in video.content_urls.items()
         ]
-        return SVideoFormatsResponse(
+        return SVideoResponse(
             url=self.url,
             title=video.title,
             author=video.author,

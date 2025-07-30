@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from app.schemas.main import SVideoFormatsResponse, SVideoDownload
+from app.schemas.main import SVideoResponse, SVideoDownload
 
 
 class BaseParser(ABC):
@@ -10,7 +10,7 @@ class BaseParser(ABC):
         ...
 
     @abstractmethod
-    async def get_formats(self, *args, **kwargs) -> SVideoFormatsResponse:
+    async def get_formats(self, *args, **kwargs) -> SVideoResponse:
         ...
 
 

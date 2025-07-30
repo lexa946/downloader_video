@@ -8,7 +8,7 @@ from app.config import settings
 from app.models.status import VideoDownloadStatus
 from app.models.storage import DOWNLOAD_TASKS, DownloadTask
 from app.parsers.base import BaseParser
-from app.schemas.main import SVideo, SVideoFormatsResponse, SVideoDownload
+from app.schemas.main import SVideoFormat, SVideoResponse, SVideoDownload
 from app.utils.video_utils import save_preview_on_s3, combine_audio_and_video
 
 
@@ -82,14 +82,14 @@ class YouTubeParser(BaseParser):
         return main_stream
 
 
-    async def get_formats(self) -> SVideoFormatsResponse:
+    async def get_formats(self) -> SVideoResponse:
         streams = await asyncio.to_thread(lambda: self._yt.streams.fmt_streams)
         audio = await asyncio.to_thread(self._get_audio_stream, streams)
 
         preview_url = await save_preview_on_s3(self._yt.thumbnail_url,self._yt.title, self._yt.author)
         duration = timedelta(milliseconds=int(audio.durationMs)).seconds
         available_formats = [
-            SVideo(
+            SVideoFormat(
                 **{
                     "quality": v_format.resolution,
                     "video_format_id": str(v_format.itag),
@@ -98,7 +98,7 @@ class YouTubeParser(BaseParser):
                 }
             ) for v_format in filter(self._format_filter, streams)
         ]
-        return SVideoFormatsResponse(
+        return SVideoResponse(
             url=self.url,
             title=self._yt.title,
             preview_url=preview_url,

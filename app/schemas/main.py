@@ -8,7 +8,7 @@ class SVideoRequest(BaseModel):
     url: str
 
 
-class SVideo(BaseModel):
+class SVideoFormat(BaseModel):
     quality: str
     filesize: Optional[int] = field(default=0)
     video_format_id: str
@@ -21,11 +21,11 @@ class SVideoDownload(BaseModel):
     audio_format_id: str
 
 
-class SVideoFormatsResponse(BaseModel):
+class SVideoResponse(BaseModel):
     url: str
     title: str
     author: str
-    formats: list[SVideo]
+    formats: list[SVideoFormat]
     preview_url: Optional[str] = field(default=None)
     duration: Optional[int] = field(default=None)
 
@@ -35,4 +35,5 @@ class SVideoStatus(BaseModel):
     status: str
     description: str = field(default=None)
     percent: float = field(default=0)
+    video: SVideoResponse
 

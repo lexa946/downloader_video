@@ -1,6 +1,6 @@
 import pytest
 
-from app.schemas.main import SVideoFormatsResponse
+from app.schemas.main import SVideoResponse
 
 
 @pytest.mark.parametrize(
@@ -33,7 +33,7 @@ def test_get_all_formats(client, url:str, title: str, author: str, count_formats
     response = client.get("/api/get-formats", params={"url": url})
     assert response.status_code == 200
 
-    format_response = SVideoFormatsResponse.model_validate(response.json())
+    format_response = SVideoResponse.model_validate(response.json())
     assert format_response.title == title
     assert format_response.author == author
     assert len(format_response.formats) == count_formats

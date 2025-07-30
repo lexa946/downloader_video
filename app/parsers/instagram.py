@@ -10,7 +10,7 @@ from app.config import settings
 from app.models.status import VideoDownloadStatus
 from app.models.storage import DOWNLOAD_TASKS, DownloadTask
 from app.parsers.base import BaseParser
-from app.schemas.main import SVideoFormatsResponse, SVideoDownload, SVideo
+from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
 from app.utils.video_utils import save_preview_on_s3
 
 
@@ -104,7 +104,7 @@ class InstagramParser(BaseParser):
         json_ = json.loads(json_tag.text)
         return InstagramVideo.from_json(json_)
 
-    async def get_formats(self) -> SVideoFormatsResponse:
+    async def get_formats(self) -> SVideoResponse:
         async with aiohttp.ClientSession() as session:
             async with session.get(self.url, headers=self.headers, cookies=self.cookies) as response:
                 response.raise_for_status()
@@ -115,7 +115,7 @@ class InstagramParser(BaseParser):
         preview_url = await save_preview_on_s3(video.preview_url, video.title,  video.author)
 
         available_formats = [
-            SVideo(
+            SVideoFormat(
                 **{
                     "quality": video.quality,
                     "video_format_id": "",
@@ -124,7 +124,7 @@ class InstagramParser(BaseParser):
                 }
             )
         ]
-        return SVideoFormatsResponse(
+        return SVideoResponse(
             url=self.url,
             title=video.title,
             author=video.author,

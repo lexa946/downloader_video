@@ -1,32 +1,44 @@
 {% extends "base.html" %}
 
 {% block body %}
-<div class="bg-white p-6 rounded-lg shadow-lg w-96">
-    <h1 class="text-xl font-semibold mt-4 mb-4">Video Downloader</h1>
-    <p class="text-xl font-semibold mb-4">
-        Вы можете скачивать видео с Youtube, Instagram и VK.
-    </p>
-    <input id="videoUrl" type="text" placeholder="Введите ссылку на видео" class="w-full p-2 border rounded-md">
-    <button onclick="fetchFormats()" class="mt-2 w-full bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">
-        Получить форматы видео
-    </button>
 
-    <div id="videoPreview" class="mt-4 hidden">
-        <h2 id="videoTitle" class="text-xl font-semibold mb-4"></h2>
-        <img id="previewImg" class="w-full rounded-md" alt="Video Preview">
-    </div>
-    <div id="loading" class="hidden flex justify-center items-center mt-4">
-        <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-blue-500"></div>
+<div class="flex gap-6 items-start">
+    <!-- Главная карточка -->
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h1 class="text-xl font-semibold mt-4 mb-4">Video Downloader</h1>
+        <p class="text-xl font-semibold mb-4">
+            Вы можете скачивать видео с Youtube, Instagram и VK.
+        </p>
+        <input id="videoUrl" type="text" placeholder="Введите ссылку на видео" class="w-full p-2 border rounded-md">
+        <button onclick="fetchFormats()"
+                class="mt-2 w-full bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">
+            Получить форматы видео
+        </button>
+
+        <div id="videoPreview" class="mt-4 hidden">
+            <h2 id="videoTitle" class="text-xl font-semibold mb-4"></h2>
+            <img id="previewImg" class="w-full rounded-md" alt="Video Preview">
+        </div>
+        <div id="loading" class="hidden flex justify-center items-center mt-4">
+            <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-blue-500"></div>
+        </div>
+
+        <div id="formats" class="mt-4"></div>
+
+        <div id="progress-container" class="hidden w-full bg-gray-200 rounded-full mt-4">
+            <div id="progress-bar" class="h-2 bg-green-500 rounded-full transition-all duration-300"
+                 style="width: 0%"></div>
+        </div>
+        <p id="status-text" class="text-center text-gray-600 hidden mt-2">Скачивание...</p>
     </div>
 
-    <div id="formats" class="mt-4"></div>
-
-    <div id="progress-container" class="hidden w-full bg-gray-200 rounded-full mt-4">
-        <div id="progress-bar" class="h-2 bg-green-500 rounded-full transition-all duration-300"
-             style="width: 0%"></div>
+    <!-- Блок истории -->
+    <div id="history" class="w-80 max-h-[600px] overflow-y-auto bg-gray-50 p-4 rounded-lg shadow">
+        <h2 class="text-lg font-semibold mb-4">История скачивания</h2>
+        <div id="history-list" class="flex flex-col gap-3"></div>
     </div>
-    <p id="status-text" class="text-center text-gray-600 hidden mt-2">Скачивание...</p>
 </div>
+
 
 <script>
     const apiUrl = window.location.origin;
@@ -46,10 +58,11 @@
         document.getElementById('videoPreview').classList.add('hidden');
         document.getElementById("loading").classList.remove("hidden");
         document.getElementById("formats").innerHTML = ""; // Очищаем прошлые результаты
-
-        const response = await fetch(`${apiUrl}/api/get-formats?url=${url}`, {
-            method: 'GET',
+        console.log()
+        const response = await fetch(`${apiUrl}/api/get-formats`, {
+            method: 'POST',
             headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url})
         });
 
         const data = await response.json();
@@ -81,7 +94,8 @@
         document.querySelectorAll('#formats button').forEach(btn => {
             btn.disabled = true;
         });
-        btn.onclick = () => {};
+        btn.onclick = () => {
+        };
         btn.textContent = "Подготовка...";
         btn.disabled = false;
         btn.classList.add("bg-yellow-500", "animate-pulse");
@@ -158,6 +172,55 @@
         link.click();
         document.body.removeChild(link);
     }
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+
+
+    async function loadHistory() {
+        const userId = getCookie("user_id");
+        if (!userId) return console.warn("user_id not found in cookies");
+
+        try {
+            const res = await fetch(`${apiUrl}/user/${userId}/history`);
+            if (!res.ok) throw new Error("Failed to load history");
+
+            const data = await res.json();
+            console.log(data);
+            const container = document.getElementById("history-list");
+            container.innerHTML = "";
+            data.history.forEach(entry => {
+                console.log(entry)
+
+                const card = document.createElement("div");
+                card.className = "bg-white p-2 rounded shadow flex gap-2 cursor-pointer hover:bg-gray-100 transition";
+
+                card.onclick = () => {
+                    document.getElementById("videoUrl").value = entry.video.url;
+                    fetchFormats(); // повторный парсинг
+                };
+
+                card.innerHTML = `
+                <img src="${entry.video.preview_url}" class="w-20 h-12 object-cover rounded">
+                <div class="flex flex-col justify-center">
+                    <p class="text-sm font-medium truncate w-40">${entry.video.title}</p>
+                    <p class="text-xs text-gray-500">${entry.video.author}</p>
+                </div>
+            `;
+                container.appendChild(card);
+            });
+        } catch (err) {
+            console.error("Ошибка загрузки истории:", err);
+        }
+    }
+
+
+    window.onload = () => {
+        loadHistory();
+    };
 
 
 </script>

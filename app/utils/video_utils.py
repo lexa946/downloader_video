@@ -4,10 +4,13 @@ import subprocess
 from logging import getLogger
 from pathlib import Path
 
+import aiofiles
 import aiohttp
 from Crypto.Util.py3compat import BytesIO
 
 from app.config import settings
+from app.models.status import VideoDownloadStatus
+from app.models.storage import DownloadTask
 from app.s3.client import s3_client
 
 LOG = getLogger()
@@ -20,15 +23,17 @@ else:
 
 
 
-async def stream_file(file_path: Path, chunk_size: int = 1024 * 1024):
+async def stream_file(file_path: Path, task: DownloadTask, chunk_size: int = 1024 * 1024):
     try:
-        with file_path.open("rb") as file:
-            while chunk := file.read(chunk_size):
+        async with aiofiles.open(file_path, "rb") as file:
+            while chunk := await file.read(chunk_size):
                 yield chunk
     finally:
         await asyncio.sleep(1)
         file_path.unlink()
         LOG.info(f"Файл {file_path} удален.")
+        task.video_status.status = VideoDownloadStatus.DONE
+        task.video_status.description = VideoDownloadStatus.DONE
 
 
 async def save_preview_on_s3(preview_url: str, key: str, folder: str = None) -> str:

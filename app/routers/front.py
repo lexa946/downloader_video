@@ -24,3 +24,6 @@ async def favicon():
 @router.get("/yandex_c51849ff7e8fe28a.html")
 async def yandex_c51849ff7e8fe28a(request: Request):
     return templates.TemplateResponse(name='yandex_c51849ff7e8fe28a.html', context={"request": request})
+@router.get("/google66673ccfa0013d45.html")
+async def yandex_c51849ff7e8fe28a(request: Request):
+    return templates.TemplateResponse(name='google66673ccfa0013d45.html', context={"request": request})

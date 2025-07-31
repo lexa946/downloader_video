@@ -122,9 +122,36 @@
             preview.classList.remove("hidden");
         }
 
+        function showAdModal() {
+            const modal = document.getElementById("modal-ad");
+            const closeBtn = document.getElementById("modal-close");
+
+            modal.classList.remove("hidden");
+
+            let countdown = 5;
+            closeBtn.textContent = `Закрыть (${countdown})`;
+            closeBtn.disabled = true;
+
+            const interval = setInterval(() => {
+                countdown--;
+                closeBtn.textContent = `Закрыть (${countdown})`;
+                if (countdown <= 0) {
+                    clearInterval(interval);
+                    closeBtn.disabled = false;
+                    closeBtn.textContent = "Закрыть";
+                }
+            }, 1000);
+
+            closeBtn.onclick = () => {
+                modal.classList.add("hidden");
+            };
+        }
+
         async function startDownload(url, video_format_id, audio_format_id, btn) {
             disableAllFormatButtons(true);
             updateStatus("Скачивание...");
+
+            showAdModal();
 
             const res = await fetch(`${apiBase}/api/start-download`, {
                 method: "POST",
@@ -249,7 +276,6 @@
     <script>window.yaContextCb = window.yaContextCb || []</script>
     <script src="https://yandex.ru/ads/system/context.js" async></script>
 
-
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 <div class="bg-white shadow-lg rounded-lg p-6 w-full max-w-lg">
@@ -298,58 +324,29 @@
 
 <div id="modal-ad" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
     <div class="bg-white p-6 rounded shadow max-w-sm w-full text-center relative">
-        <h2 class="text-lg font-semibold mb-2">🎁 Специальное предложение</h2>
-        <div id="yandex-ad-slot" class="mb-4">
-            <!-- Yandex.RTB R-A-16518515-1 -->
-
-        </div>
+        <!-- Yandex.RTB R-A-16518515-1 -->
+        <script>
+            window.yaContextCb.push(() => {
+                Ya.Context.AdvManager.render({
+                    "blockId": "R-A-16518515-1",
+                    "type": "fullscreen",
+                    "platform": "touch"
+                })
+            })
+        </script>
         <button id="modal-close" class="absolute top-2 right-2 text-gray-500 hover:text-black" disabled>Закрыть (5)
         </button>
     </div>
 </div>
-
+<!-- Yandex.RTB R-A-16518515-1 -->
 <script>
-    function showAdModal() {
-        if (sessionStorage.getItem("ad_shown")) return;
-
-        const modal = document.getElementById("modal-ad");
-        const closeBtn = document.getElementById("modal-close");
-
-        modal.classList.remove("hidden");
-
-        let countdown = 5;
-        closeBtn.textContent = `Закрыть (${countdown})`;
-        closeBtn.disabled = true;
-
-        const interval = setInterval(() => {
-            countdown--;
-            closeBtn.textContent = `Закрыть (${countdown})`;
-            if (countdown <= 0) {
-                clearInterval(interval);
-                closeBtn.disabled = false;
-                closeBtn.textContent = "Закрыть";
-            }
-        }, 1000);
-
-        closeBtn.onclick = () => {
-            modal.classList.add("hidden");
-            sessionStorage.setItem("ad_shown", "true");
-        };
-
-        // Загружаем рекламу только после показа окна
-        if (window.yaContextCb) {
-            window.yaContextCb.push(() => {
-                Ya.Context.AdvManager.render({
-                    blockId: "R-A-16518515-1",
-                    type: "fullscreen",
-                    platform: "touch"
-                });
-            });
-        }
-    }
-
+window.yaContextCb.push(() => {
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-16518515-1",
+        "type": "fullscreen",
+        "platform": "touch"
+    })
+})
 </script>
-
-
 </body>
 </html>

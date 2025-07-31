@@ -27,3 +27,10 @@ async def yandex_c51849ff7e8fe28a(request: Request):
 @router.get("/google66673ccfa0013d45.html")
 async def yandex_c51849ff7e8fe28a(request: Request):
     return templates.TemplateResponse(name='google66673ccfa0013d45.html', context={"request": request})
+
+@router.get("/robots.txt")
+async def yandex_c51849ff7e8fe28a(request: Request):
+    return templates.TemplateResponse(name='robots.txt', context={"request": request})
+@router.get("/sitemap.xml")
+async def yandex_c51849ff7e8fe28a(request: Request):
+    return templates.TemplateResponse(name='sitemap.xml', context={"request": request})

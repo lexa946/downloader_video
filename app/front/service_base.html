@@ -151,7 +151,7 @@
             disableAllFormatButtons(true);
             updateStatus("Скачивание...");
 
-            showAdModal();
+            // showAdModal();
 
             const res = await fetch(`${apiBase}/api/start-download`, {
                 method: "POST",
@@ -322,32 +322,32 @@
     <div id="history" class="flex flex-col gap-3"></div>
 </div>
 
-<div id="modal-ad" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-    <div class="bg-white p-6 rounded shadow max-w-sm w-full text-center relative">
-        <!-- Yandex.RTB R-A-16518515-1 -->
-        <script>
-            window.yaContextCb.push(() => {
-                Ya.Context.AdvManager.render({
-                    "blockId": "R-A-16518515-1",
-                    "type": "fullscreen",
-                    "platform": "touch"
-                })
-            })
-        </script>
-        <!-- Yandex.RTB R-A-16518515-2 -->
-        <script>
-            window.yaContextCb.push(() => {
-                Ya.Context.AdvManager.render({
-                    "blockId": "R-A-16518515-2",
-                    "type": "fullscreen",
-                    "platform": "desktop"
-                })
-            })
-        </script>
-        <button id="modal-close" class="absolute top-2 right-2 text-gray-500 hover:text-black" disabled>Закрыть (5)
-        </button>
-    </div>
-</div>
+<!--<div id="modal-ad" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">-->
+<!--    <div class="bg-white p-6 rounded shadow max-w-sm w-full text-center relative">-->
+<!--        &lt;!&ndash; Yandex.RTB R-A-16518515-1 &ndash;&gt;-->
+<!--        <script>-->
+<!--            window.yaContextCb.push(() => {-->
+<!--                Ya.Context.AdvManager.render({-->
+<!--                    "blockId": "R-A-16518515-1",-->
+<!--                    "type": "fullscreen",-->
+<!--                    "platform": "touch"-->
+<!--                })-->
+<!--            })-->
+<!--        </script>-->
+<!--        &lt;!&ndash; Yandex.RTB R-A-16518515-2 &ndash;&gt;-->
+<!--        <script>-->
+<!--            window.yaContextCb.push(() => {-->
+<!--                Ya.Context.AdvManager.render({-->
+<!--                    "blockId": "R-A-16518515-2",-->
+<!--                    "type": "fullscreen",-->
+<!--                    "platform": "desktop"-->
+<!--                })-->
+<!--            })-->
+<!--        </script>-->
+<!--        <button id="modal-close" class="absolute top-2 right-2 text-gray-500 hover:text-black" disabled>Закрыть (5)-->
+<!--        </button>-->
+<!--    </div>-->
+<!--</div>-->
 <!-- Yandex.RTB R-A-16518515-1 -->
 <script>
     window.yaContextCb.push(() => {

@@ -153,7 +153,10 @@
                 status = json.status;
                 const percent = json.percent || 0;
                 bar.style.width = `${percent}%`;
-                bar.textContent = `${percent}%`;
+                if (percent > 10) {
+                    bar.textContent = `${percent}%`;
+                }
+
             }
 
             btn.classList.remove("blinking");
@@ -206,7 +209,7 @@
             const list = document.getElementById("history");
             list.innerHTML = "";
 
-            data.history.forEach(item => {
+            data.history.reverse().forEach(item => {
                 const card = document.createElement("div");
                 card.className = "flex bg-white rounded shadow p-2 cursor-pointer hover:bg-gray-100 items-center";
                 card.onclick = () => fetchFormats(item.video.url);

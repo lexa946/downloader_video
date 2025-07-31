@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Video Downloader</title>
     <style>
@@ -244,17 +244,24 @@
         };
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Yandex.RTB -->
+    <script>window.yaContextCb = window.yaContextCb || []</script>
+    <script src="https://yandex.ru/ads/system/context.js" async></script>
+
+
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 <div class="bg-white shadow-lg rounded-lg p-6 w-full max-w-lg">
     <h1 class="text-2xl font-semibold mb-2">Скачивание видео</h1>
     <p class="mb-4 text-gray-700 text-sm">
-        Вы можете скачивать видео с YouTube, VkVideo и Instagram. Вставьте ссылку на видео выше и выберите подходящий формат.
+        Вы можете скачивать видео с YouTube, VkVideo и Instagram. Вставьте ссылку на видео выше и выберите подходящий
+        формат.
     </p>
 
     <div class="input-wrapper mb-2">
         <input type="text" id="video-url" placeholder="Вставьте ссылку на видео"
-               class="w-full p-2 pr-8 border rounded" />
+               class="w-full p-2 pr-8 border rounded"/>
         <span class="clear-btn" onclick="clearInput()">×</span>
     </div>
 
@@ -262,7 +269,8 @@
             onclick="handleGetFormats()"
             class="w-full bg-blue-500 hover:bg-blue-600 text-white p-2 rounded flex items-center justify-center gap-2">
         <span id="btn-label">Получить форматы</span>
-        <svg id="btn-spinner" class="hidden animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <svg id="btn-spinner" class="hidden animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg"
+             fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
         </svg>
@@ -287,5 +295,61 @@
     <h3 class="text-lg font-semibold mb-2">История</h3>
     <div id="history" class="flex flex-col gap-3"></div>
 </div>
+
+<div id="modal-ad" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white p-6 rounded shadow max-w-sm w-full text-center relative">
+        <h2 class="text-lg font-semibold mb-2">🎁 Специальное предложение</h2>
+        <div id="yandex-ad-slot" class="mb-4">
+            <!-- Yandex.RTB R-A-16518515-1 -->
+
+        </div>
+        <button id="modal-close" class="absolute top-2 right-2 text-gray-500 hover:text-black" disabled>Закрыть (5)
+        </button>
+    </div>
+</div>
+
+<script>
+    function showAdModal() {
+        if (sessionStorage.getItem("ad_shown")) return;
+
+        const modal = document.getElementById("modal-ad");
+        const closeBtn = document.getElementById("modal-close");
+
+        modal.classList.remove("hidden");
+
+        let countdown = 5;
+        closeBtn.textContent = `Закрыть (${countdown})`;
+        closeBtn.disabled = true;
+
+        const interval = setInterval(() => {
+            countdown--;
+            closeBtn.textContent = `Закрыть (${countdown})`;
+            if (countdown <= 0) {
+                clearInterval(interval);
+                closeBtn.disabled = false;
+                closeBtn.textContent = "Закрыть";
+            }
+        }, 1000);
+
+        closeBtn.onclick = () => {
+            modal.classList.add("hidden");
+            sessionStorage.setItem("ad_shown", "true");
+        };
+
+        // Загружаем рекламу только после показа окна
+        if (window.yaContextCb) {
+            window.yaContextCb.push(() => {
+                Ya.Context.AdvManager.render({
+                    blockId: "R-A-16518515-1",
+                    type: "fullscreen",
+                    platform: "touch"
+                });
+            });
+        }
+    }
+
+</script>
+
+
 </body>
 </html>

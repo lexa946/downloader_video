@@ -20,3 +20,7 @@ async def index(request: Request):
 @router.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     return FileResponse("app/front/static/favicon.png")
+
+@router.get("/yandex_c51849ff7e8fe28a.html")
+async def yandex_c51849ff7e8fe28a(request: Request):
+    return templates.TemplateResponse(name='yandex_c51849ff7e8fe28a.html', context={"request": request})

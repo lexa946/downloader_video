@@ -288,7 +288,34 @@
     <!-- Yandex.RTB -->
     <script>window.yaContextCb = window.yaContextCb || []</script>
     <script src="https://yandex.ru/ads/system/context.js" async></script>
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+        (function (m, e, t, r, i, k, a) {
+            m[i] = m[i] || function () {
+                (m[i].a = m[i].a || []).push(arguments)
+            };
+            m[i].l = 1 * new Date();
+            for (var j = 0; j < document.scripts.length; j++) {
+                if (document.scripts[j].src === r) {
+                    return;
+                }
+            }
+            k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
+        })(window, document, 'script', 'https://mc.yandex.ru/metrika/tag.js?id=103560690', 'ym');
 
+        ym(103560690, 'init', {
+            ssr: true,
+            webvisor: true,
+            clickmap: true,
+            ecommerce: "dataLayer",
+            accurateTrackBounce: true,
+            trackLinks: true
+        });
+    </script>
+    <noscript>
+        <div><img src="https://mc.yandex.ru/watch/103560690" style="position:absolute; left:-9999px;" alt=""/></div>
+    </noscript>
+    <!-- /Yandex.Metrika counter -->
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 <div class="bg-white shadow-lg rounded-lg p-6 w-full max-w-lg">

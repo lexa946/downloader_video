@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Часто задаваемые вопросы - Video Downloader</title>
+    <meta name="description" content="Ответы на частые вопросы о скачивании видео с YouTube, Instagram, VK, VK Video. Поддерживаемые форматы, качество, ограничения.">
+    <meta name="keywords" content="faq, вопросы, скачать видео, помощь, поддержка">
+    <meta name="robots" content="index, follow">
+    
+    <link rel="canonical" href="https://downloader.pozharsite.ru/faq">
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    <link rel="stylesheet" href="/new/static/css/styles.css">
+    
+    <style>
+        .faq-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .faq-item {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .faq-question {
+            padding: 20px;
+            background: #f8f9fa;
+            cursor: pointer;
+            border: none;
+            width: 100%;
+            text-align: left;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s ease;
+        }
+        
+        .faq-question:hover {
+            background: #e9ecef;
+        }
+        
+        .faq-question::after {
+            content: '+';
+            font-size: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+        
+        .faq-question.active::after {
+            transform: rotate(45deg);
+        }
+        
+        .faq-answer {
+            padding: 0 20px;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .faq-answer.active {
+            padding: 20px;
+            max-height: 500px;
+        }
+        
+        .faq-answer p {
+            color: #7f8c8d;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .faq-answer ul {
+            color: #7f8c8d;
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .faq-answer ul li {
+            margin-bottom: 8px;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 30px;
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <nav class="navbar">
+                <div class="nav-brand">
+                    <a href="/new/" class="brand-link">
+                        <span class="brand-icon">📥</span>
+                        <span class="brand-text">Video Downloader</span>
+                    </a>
+                    <p class="brand-tagline">Скачать видео бесплатно онлайн</p>
+                </div>
+                
+                <button class="nav-toggle" id="navToggle" aria-label="Открыть меню">
+                    <span class="hamburger"></span>
+                    <span class="hamburger"></span>
+                    <span class="hamburger"></span>
+                </button>
+                
+                <div class="nav-menu" id="navMenu">
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <a href="/new/" class="nav-link">Главная</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/new/faq" class="nav-link active">FAQ</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/new/privacy" class="nav-link">Конфиденциальность</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/new/terms" class="nav-link">Условия</a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </header>
+        
+        <div class="faq-container">
+            
+            <h1>Часто задаваемые вопросы</h1>
+            
+            <div class="faq-item">
+                <button class="faq-question">
+                    Какие сайты поддерживаются?
+                </button>
+                <div class="faq-answer">
+                    <p>Наш сервис поддерживает скачивание видео с популярных платформ:</p>
+                    <ul>
+                        <li><strong>YouTube</strong> - все типы видео, включая музыку</li>
+                        <li><strong>Instagram</strong> - посты и stories</li>
+                        <li><strong>VKontakte</strong> - видео из постов и групп</li>
+                        <li><strong>VK Video</strong> - видео с платформы vkvideo.ru</li>
+                    </ul>
+                    <p>Мы постоянно работаем над добавлением поддержки новых платформ.</p>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <button class="faq-question">
+                    В каком качестве можно скачать видео?
+                </button>
+                <div class="faq-answer">
+                    <p>Доступные качества зависят от исходного видео:</p>
+                    <ul>
+                        <li><strong>4K (2160p)</strong> - максимальное качество</li>
+                        <li><strong>Full HD (1080p)</strong> - высокое качество</li>
+                        <li><strong>HD (720p)</strong> - хорошее качество</li>
+                        <li><strong>480p, 360p, 240p</strong> - для медленного интернета</li>
+                    </ul>
+                    <p>Также доступно скачивание только аудио в формате MP3.</p>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <button class="faq-question">
+                    Нужна ли регистрация для использования сервиса?
+                </button>
+                <div class="faq-answer">
+                    <p>Нет, регистрация не требуется! Наш сервис полностью бесплатный и не требует создания аккаунта. Просто вставьте ссылку на видео и скачивайте.</p>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <button class="faq-question">
+                    Есть ли ограничения на количество скачиваний?
+                </button>
+                <div class="faq-answer">
+                    <p>Для обычного использования ограничений нет. Однако мы можем временно ограничить доступ при обнаружении автоматических запросов или чрезмерной нагрузки с одного IP-адреса.</p>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <button class="faq-question">
+                    Сколько времени занимает скачивание?
+                </button>
+                <div class="faq-answer">
+                    <p>Время скачивания зависит от нескольких факторов:</p>
+                    <ul>
+                        <li>Размер и качество видео</li>
+                        <li>Скорость вашего интернет-соединения</li>
+                        <li>Текущая нагрузка на сервер</li>
+                    </ul>
+                    <p>Обычно процесс занимает от нескольких секунд до нескольких минут.</p>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <button class="faq-question">
+                    Какие форматы файлов поддерживаются?
+                </button>
+                <div class="faq-answer">
+                    <p>Мы предоставляем видео в следующих форматах:</p>
+                    <ul>
+                        <li><strong>MP4</strong> - универсальный формат для видео</li>
+                        <li><strong>MP3</strong> - для аудио файлов</li>
+                    </ul>
+                    <p>Все файлы оптимизированы для воспроизведения на большинстве устройств.</p>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <button class="faq-question">
+                    Безопасно ли использовать этот сервис?
+                </button>
+                <div class="faq-answer">
+                    <p>Да, наш сервис полностью безопасен:</p>
+                    <ul>
+                        <li>Мы не сохраняем ваши личные данные</li>
+                        <li>Не требуем регистрации или входа в аккаунты</li>
+                        <li>Используем защищенное HTTPS соединение</li>
+                        <li>Скачанные файлы удаляются с сервера через 24 часа</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <button class="faq-question">
+                    Что делать, если видео не скачивается?
+                </button>
+                <div class="faq-answer">
+                    <p>Если возникли проблемы со скачиванием, попробуйте:</p>
+                    <ul>
+                        <li>Проверить правильность ссылки на видео</li>
+                        <li>Убедиться, что видео публично доступно</li>
+                        <li>Попробовать другое качество</li>
+                        <li>Обновить страницу и попробовать снова</li>
+                    </ul>
+                    <p>Некоторые видео могут быть заблокированы правообладателем или недоступны в вашем регионе.</p>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <button class="faq-question">
+                    Можно ли скачать приватные видео?
+                </button>
+                <div class="faq-answer">
+                    <p>Нет, наш сервис может скачивать только публично доступные видео. Приватные видео, закрытые группы или контент, требующий авторизации, недоступны для скачивания.</p>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <button class="faq-question">
+                    Нарушает ли это авторские права?
+                </button>
+                <div class="faq-answer">
+                    <p>Мы предоставляем только техническую возможность скачивания. Ответственность за соблюдение авторских прав лежит на пользователе. Рекомендуем скачивать только контент:</p>
+                    <ul>
+                        <li>Который вы создали сами</li>
+                        <li>На который у вас есть права</li>
+                        <li>Который распространяется свободно</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // FAQ accordion functionality
+        document.querySelectorAll('.faq-question').forEach(button => {
+            button.addEventListener('click', () => {
+                const answer = button.nextElementSibling;
+                const isActive = button.classList.contains('active');
+                
+                // Закрываем все открытые ответы
+                document.querySelectorAll('.faq-question.active').forEach(activeBtn => {
+                    activeBtn.classList.remove('active');
+                    activeBtn.nextElementSibling.classList.remove('active');
+                });
+                
+                // Открываем текущий, если он не был активен
+                if (!isActive) {
+                    button.classList.add('active');
+                    answer.classList.add('active');
+                }
+            });
+        });
+        
+        // Navigation functions (simplified version for other pages)
+        const navToggle = document.getElementById('navToggle');
+        const navMenu = document.getElementById('navMenu');
+        
+        if (navToggle && navMenu) {
+            navToggle.addEventListener('click', function() {
+                navMenu.classList.toggle('active');
+                navToggle.classList.toggle('active');
+            });
+            
+            // Close menu when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!navToggle.contains(e.target) && !navMenu.contains(e.target)) {
+                    navMenu.classList.remove('active');
+                    navToggle.classList.remove('active');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

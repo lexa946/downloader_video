@@ -5,7 +5,7 @@ from typing import Annotated
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Path, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from starlette import status
 
 from app.models.services import VideoServicesManager
@@ -23,18 +23,46 @@ LOG = getLogger()
 @router.post("/get-formats")
 async def get_video_formats(video_request: SVideoRequest) -> SVideoResponse:
     """Получаем все доступные форматы видео"""
-    if video_request.url in VIDEO_META_CACHE:
-        return VIDEO_META_CACHE[video_request.url]
+    try:
+        print(f"Service: Processing URL: {video_request.url}")
+        
+        if video_request.url in VIDEO_META_CACHE:
+            print(f"Service: Found in cache")
+            return VIDEO_META_CACHE[video_request.url]
 
-    service = VideoServicesManager.get_service(video_request.url)
-    available_formats = await service.parser(video_request.url).get_formats()
-    if not available_formats:
+        service = VideoServicesManager.get_service(video_request.url)
+        print(f"Service: Using service: {service.name}")
+        
+        parser_instance = service.parser(video_request.url)
+        print(f"Service: Created parser instance")
+        
+        available_formats = await parser_instance.get_formats()
+        
+        if not available_formats:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Can't find formats."
+            )
+        if not available_formats.formats:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No video formats available."
+            )
+            
+        VIDEO_META_CACHE[video_request.url] = available_formats
+        print(f"Service: Successfully cached and returning {len(available_formats.formats)} formats")
+        return available_formats
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Service error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Can't find formats."
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
         )
-    VIDEO_META_CACHE[video_request.url] = available_formats
-    return available_formats
 
 
 @router.post("/start-download")
@@ -62,9 +90,9 @@ async def get_download_status(task_id: Annotated[str, Path()]) -> SVideoStatus:
     return DOWNLOAD_TASKS[task_id].video_status
 
 
-@router.get("/get-video/{task_id}")
+@router.api_route("/get-video/{task_id}", methods=["GET", "HEAD"])
 @check_task_id
-async def get_downloaded_video(task_id: Annotated[str, Path()]) -> StreamingResponse:
+async def get_downloaded_video(request: Request, task_id: Annotated[str, Path()]):
     """Отдает файл, если он скачан"""
     task: DownloadTask = DOWNLOAD_TASKS[task_id]
 
@@ -80,12 +108,24 @@ async def get_downloaded_video(task_id: Annotated[str, Path()]) -> StreamingResp
             detail="The file does not exist."
         )
     filename = quote(task.filepath.stem)[43:]
+    
+    headers = {
+        "Content-Disposition": f"attachment; filename={filename}.mp4",
+        "Content-Length": str(task.filepath.stat().st_size),
+        "Cache-Control": "no-cache",
+        "Accept-Ranges": "bytes",
+    }
 
+    # Для HEAD запросов возвращаем только заголовки
+    if request.method == "HEAD":
+        return Response(
+            headers=headers,
+            media_type="application/octet-stream"
+        )
+    
+    # Для GET запросов возвращаем файл
     return StreamingResponse(
         stream_file(task.filepath, task),
-        media_type="video/mp4",
-        headers={
-            "Content-Disposition": f"attachment; filename={filename}.mp4",
-            "Content-Length": str(task.filepath.stat().st_size),
-        }
+        media_type="application/octet-stream",
+        headers=headers
     )

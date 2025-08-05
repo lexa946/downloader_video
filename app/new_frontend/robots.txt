@@ -1,0 +1,23 @@
+User-agent: *
+Allow: /
+Allow: /faq
+Allow: /privacy
+Allow: /static/
+
+# Запрещаем индексацию API эндпоинтов
+Disallow: /api/
+
+# Запрещаем индексацию временных файлов скачивания
+Disallow: /downloads/
+Disallow: /temp/
+
+# Разрешаем основные страницы
+Allow: /$
+Allow: /faq$
+Allow: /privacy$
+
+# Указываем sitemap
+Sitemap: https://downloader.pozharsite.ru/sitemap.xml
+
+# Задержка для ботов (защита от перегрузки)
+Crawl-delay: 1

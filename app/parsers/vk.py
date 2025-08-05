@@ -1,5 +1,6 @@
 import asyncio
 import re
+import ssl
 import aiofiles
 from pathlib import Path
 
@@ -25,17 +26,33 @@ class VkVideo:
 
     @classmethod
     def from_json(cls, json_: dict):
-        video_info = json_['payload'][1][4]['player']['params'][0]
-        video_title = video_info['md_title']
-        video_author = video_info['md_author']
-        content_urls = {
-            str(quality): video_info[f"url{quality}"] for quality in (144, 240, 360, 480, 720, 1080)
-            if f"url{quality}" in video_info
-        }
-        video_preview_url = video_info['jpg']
-        video_duration = video_info['duration']
-        size = 0
-        return cls(video_title, video_author, content_urls, video_preview_url, video_duration, size)
+        try:
+            # Разные возможные структуры ответа от VK API
+            if 'payload' in json_ and len(json_['payload']) > 1:
+                video_info = json_['payload'][1][4]['player']['params'][0]
+            else:
+                # Альтернативная структура
+                video_info = json_
+                
+            video_title = video_info.get('md_title', 'Без названия')
+            video_author = video_info.get('md_author', 'Неизвестный автор')
+            
+            # Ищем доступные качества видео
+            content_urls = {}
+            for quality in (144, 240, 360, 480, 720, 1080):
+                url_key = f"url{quality}"
+                if url_key in video_info and video_info[url_key]:
+                    content_urls[str(quality)] = video_info[url_key]
+            
+            video_preview_url = video_info.get('jpg', '')
+            video_duration = video_info.get('duration', 0)
+            size = 0
+            
+            return cls(video_title, video_author, content_urls, video_preview_url, video_duration, size)
+        except Exception as e:
+            print(f"Error parsing VK video info: {e}")
+            print(f"JSON structure: {json_}")
+            raise ValueError(f"Cannot parse VK video info: {e}")
 
 
 class VkParser(BaseParser):
@@ -57,6 +74,11 @@ class VkParser(BaseParser):
             "Referer": f"https://vkvideo.ru/video-{self.owner_id}_{self.video_id}",
         }
         self._lock = asyncio.Lock()
+        
+        # Создаем SSL контекст который игнорирует ошибки сертификатов
+        self._ssl_context = ssl.create_default_context()
+        self._ssl_context.check_hostname = False
+        self._ssl_context.verify_mode = ssl.CERT_NONE
 
     async def _fetch_range(self,
                            session: aiohttp.ClientSession,
@@ -72,7 +94,7 @@ class VkParser(BaseParser):
             **self._headers,
             "Range": f"bytes={start}-{end}",
         }
-        async with session.get(url, headers=headers) as resp:
+        async with session.get(url, headers=headers, ssl=self._ssl_context) as resp:
             resp.raise_for_status()
 
             part_file = download_path.parent / task_id / f"part_{part_number}.tmp"
@@ -102,14 +124,33 @@ class VkParser(BaseParser):
             "is_video_page": True,
             "video": f"-{self.owner_id}_{self.video_id}",
         }
-        async with session.post(self.VIDEO_INFO_URL, data=data) as response:
-            response.raise_for_status()
-            response_json = await response.json()
-        return response_json
+        try:
+            async with session.post(self.VIDEO_INFO_URL, data=data, ssl=self._ssl_context) as response:
+                response.raise_for_status()
+                response_text = await response.text()
+                
+                # VK возвращает не чистый JSON, а JSONP с префиксом
+                if response_text.startswith('<!--'):
+                    # Удаляем комментарии и извлекаем JSON
+                    json_start = response_text.find('{"')
+                    if json_start != -1:
+                        response_text = response_text[json_start:]
+                        # Убираем возможные окончания
+                        if response_text.endswith('-->'):
+                            response_text = response_text[:-3]
+                
+                import json
+                response_json = json.loads(response_text)
+                return response_json
+        except Exception as e:
+            print(f"VK Parser Error: {e}")
+            print(f"URL: {self.url}")
+            print(f"Data: {data}")
+            raise
 
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = DOWNLOAD_TASKS[task_id]
-        async with aiohttp.ClientSession(headers=self._headers) as session:
+        async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context)) as session:
             response_json = await self._get_video_info(session)
             video = VkVideo.from_json(response_json)
 
@@ -124,7 +165,7 @@ class VkParser(BaseParser):
 
             content_url = video.content_urls[download_video.video_format_id]
 
-            async with session.get(content_url) as response:
+            async with session.get(content_url, ssl=self._ssl_context) as response:
                 response.raise_for_status()
                 self.total_size = int(response.headers.get('Content-Length', 0))
 
@@ -150,26 +191,45 @@ class VkParser(BaseParser):
         task.filepath = download_path
 
     async def get_formats(self) -> SVideoResponse:
-        async with aiohttp.ClientSession(headers=self._headers) as session:
-            response_json = await self._get_video_info(session)
-        video = VkVideo.from_json(response_json)
+        try:
+            print(f"VK Parser: Starting get_formats for URL: {self.url}")
+            print(f"VK Parser: owner_id={self.owner_id}, video_id={self.video_id}")
+            
+            async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context)) as session:
+                response_json = await self._get_video_info(session)
+                
+            print(f"VK Parser: Got response JSON keys: {list(response_json.keys()) if isinstance(response_json, dict) else 'Not a dict'}")
+            
+            video = VkVideo.from_json(response_json)
+            print(f"VK Parser: Parsed video - title: {video.title}, available qualities: {list(video.content_urls.keys())}")
 
-        available_formats = [
-            SVideoFormat(
-                **{
-                    "quality": f"{quality}p",
-                    "video_format_id": quality,
-                    "audio_format_id": f"",
-                    "filesize": video.size,
-                }
+            if not video.content_urls:
+                raise ValueError("No video URLs found in VK response")
+
+            available_formats = [
+                SVideoFormat(
+                    **{
+                        "quality": f"{quality}p",
+                        "video_format_id": quality,
+                        "audio_format_id": f"",
+                        "filesize": video.size,
+                    }
+                )
+                for quality, url in video.content_urls.items()
+            ]
+            
+            print(f"VK Parser: Created {len(available_formats)} formats")
+            
+            return SVideoResponse(
+                url=self.url,
+                title=video.title,
+                author=video.author,
+                preview_url=video.preview_url,
+                duration=video.duration,
+                formats=available_formats,
             )
-            for quality, url in video.content_urls.items()
-        ]
-        return SVideoResponse(
-            url=self.url,
-            title=video.title,
-            author=video.author,
-            preview_url=video.preview_url,
-            duration=video.duration,
-            formats=available_formats,
-        )
+        except Exception as e:
+            print(f"VK Parser get_formats error: {e}")
+            import traceback
+            traceback.print_exc()
+            raise

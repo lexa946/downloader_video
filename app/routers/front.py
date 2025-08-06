@@ -31,6 +31,37 @@ async def index(request: Request):
     return response
 
 
+
+@router.get("/youtube-downloader", response_class=HTMLResponse)
+async def youtube_downloader(request: Request):
+    """Страница YouTube Downloader"""
+    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
+    response = templates.TemplateResponse("youtube-downloader.html", context={"request": request, "user_id": user_id})
+    if "user_id" not in request.cookies:
+        response.set_cookie("user_id", user_id)
+    return response
+
+
+@router.get("/instagram-downloader", response_class=HTMLResponse)
+async def instagram_downloader(request: Request):
+    """Страница Instagram Downloader"""
+    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
+    response = templates.TemplateResponse("instagram-downloader.html", context={"request": request, "user_id": user_id})
+    if "user_id" not in request.cookies:
+        response.set_cookie("user_id", user_id)
+    return response
+
+
+@router.get("/vk-downloader", response_class=HTMLResponse)
+async def vk_downloader(request: Request):
+    """Страница VK Downloader"""
+    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
+    response = templates.TemplateResponse("vk-downloader.html", context={"request": request, "user_id": user_id})
+    if "user_id" not in request.cookies:
+        response.set_cookie("user_id", user_id)
+    return response
+
+
 @router.get("/faq", response_class=HTMLResponse)
 async def new_faq(request: Request):
     """Страница FAQ"""
@@ -75,3 +106,4 @@ async def yandex_verification():
     """Yandex верификация"""
     yandex_file = FRONTEND_DIR / "seo" / "yandex_c51849ff7e8fe28a.html"
     return FileResponse(yandex_file, media_type="text/html")
+

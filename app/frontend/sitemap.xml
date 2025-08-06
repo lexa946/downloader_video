@@ -33,5 +33,29 @@
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
+  
+  <!-- YouTube Downloader -->
+  <url>
+    <loc>https://downloader.pozharsite.ru/youtube-downloader</loc>
+    <lastmod>2024-12-19</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <!-- Instagram Downloader -->
+  <url>
+    <loc>https://downloader.pozharsite.ru/instagram-downloader</loc>
+    <lastmod>2024-12-19</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <!-- VK Downloader -->
+  <url>
+    <loc>https://downloader.pozharsite.ru/vk-downloader</loc>
+    <lastmod>2024-12-19</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
 
 </urlset>

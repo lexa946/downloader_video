@@ -31,7 +31,7 @@ async def stream_file(file_path: Path, task: DownloadTask, chunk_size: int = 102
     finally:
         await asyncio.sleep(1)
         file_path.unlink()
-        print(f"Файл {file_path} удален.")
+        print(f"Video Utils: stream_file = {file_path} is deleted.")
         task.video_status.status = VideoDownloadStatus.DONE
         task.video_status.description = VideoDownloadStatus.DONE
 
@@ -67,6 +67,25 @@ def combine_audio_and_video(video_path, audio_path, output_path):
         "-map", "0:v:0",  # берём видео из первого файла
         "-map", "1:a:0",  # берём аудио из второго
         "-shortest",  # обрезаем по короткому
+        "-y",  # перезапись без подтверждения
+        output_path
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def convert_to_mp3(input_path: str, output_path: str):
+    """
+    Конвертирует аудио в MP3 формат.
+
+    Args:
+        input_path (str): Путь к исходному аудио файлу
+        output_path (str): Путь для сохранения MP3
+    """
+    subprocess.run([
+        FFMPEG,
+        "-i", input_path,
+        "-vn",  # отключаем видео
+        "-acodec", "libmp3lame",  # используем MP3 кодек
+        "-q:a", "2",  # качество VBR (0-9, где 0 лучшее)
         "-y",  # перезапись без подтверждения
         output_path
     ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

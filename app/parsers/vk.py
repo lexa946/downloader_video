@@ -13,6 +13,7 @@ from app.models.storage import DOWNLOAD_TASKS, DownloadTask
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
 from app.utils.helpers import remove_all_spec_chars
+from app.utils.video_utils import convert_to_mp3
 
 
 @dataclass
@@ -74,8 +75,7 @@ class VkParser(BaseParser):
             "Referer": f"https://vkvideo.ru/video-{self.owner_id}_{self.video_id}",
         }
         self._lock = asyncio.Lock()
-        
-        # Создаем SSL контекст который игнорирует ошибки сертификатов
+
         self._ssl_context = ssl.create_default_context()
         self._ssl_context.check_hostname = False
         self._ssl_context.verify_mode = ssl.CERT_NONE
@@ -127,21 +127,8 @@ class VkParser(BaseParser):
         try:
             async with session.post(self.VIDEO_INFO_URL, data=data, ssl=self._ssl_context) as response:
                 response.raise_for_status()
-                response_text = await response.text()
-                
-                # VK возвращает не чистый JSON, а JSONP с префиксом
-                if response_text.startswith('<!--'):
-                    # Удаляем комментарии и извлекаем JSON
-                    json_start = response_text.find('{"')
-                    if json_start != -1:
-                        response_text = response_text[json_start:]
-                        # Убираем возможные окончания
-                        if response_text.endswith('-->'):
-                            response_text = response_text[:-3]
-                
-                import json
-                response_json = json.loads(response_text)
-                return response_json
+                response_json = await response.json()
+            return response_json
         except Exception as e:
             print(f"VK Parser Error: {e}")
             print(f"URL: {self.url}")
@@ -154,16 +141,20 @@ class VkParser(BaseParser):
             response_json = await self._get_video_info(session)
             video = VkVideo.from_json(response_json)
 
+            is_audio_only = not download_video.video_format_id
+            extension = '.mp3' if is_audio_only else '.mp4'
+            
             download_path = (
                     Path(settings.DOWNLOAD_FOLDER) /
                     remove_all_spec_chars(video.author) /
-                    f"{task_id}_{remove_all_spec_chars(video.title)}.mp4"
+                    f"{task_id}_{remove_all_spec_chars(video.title)}{extension}"
             )
+            temp_path = download_path.with_suffix('.temp') if is_audio_only else download_path
             download_path.parent.mkdir(parents=True, exist_ok=True)
 
-            task.video_status.description = "Downloading video track"
+            task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
 
-            content_url = video.content_urls[download_video.video_format_id]
+            content_url = video.content_urls[download_video.audio_format_id]
 
             async with session.get(content_url, ssl=self._ssl_context) as response:
                 response.raise_for_status()
@@ -178,17 +169,27 @@ class VkParser(BaseParser):
                 ranges.append((start, end, i))
 
             tasks = [
-                self._fetch_range(session, content_url, start, end, part_num, task_id, task, download_path)
+                self._fetch_range(session, content_url, start, end, part_num, task_id, task, temp_path)
                 for start, end, part_num in ranges
             ]
             part_files = await asyncio.gather(*tasks)
 
-            task.video_status.description = "Merging parts video track"
-            await self._merge_parts(part_files, download_path)
+            task.video_status.description = "Merging parts"
+            await self._merge_parts(part_files, temp_path)
+            
+            if is_audio_only:
+                task.video_status.description = "Converting to MP3"
+                await asyncio.to_thread(convert_to_mp3,
+                                    temp_path.as_posix(),
+                                    download_path.as_posix()
+                                    )
+                temp_path.unlink(missing_ok=True)
+                task.filepath = download_path
+            else:
+                task.filepath = temp_path
 
         task.video_status.status = VideoDownloadStatus.COMPLETED
         task.video_status.description = VideoDownloadStatus.COMPLETED
-        task.filepath = download_path
 
     async def get_formats(self) -> SVideoResponse:
         try:
@@ -211,12 +212,24 @@ class VkParser(BaseParser):
                     **{
                         "quality": f"{quality}p",
                         "video_format_id": quality,
-                        "audio_format_id": f"",
+                        "audio_format_id": quality,
                         "filesize": video.size,
                     }
                 )
                 for quality, url in video.content_urls.items()
             ]
+
+            min_quality = min(video.content_urls.keys(), key=int)
+            available_formats.append(
+                SVideoFormat(
+                    **{
+                        "quality": "Audio only",
+                        "video_format_id": "",
+                        "audio_format_id": min_quality,
+                        "filesize": video.size // 4,
+                    }
+                )
+            )
             
             print(f"VK Parser: Created {len(available_formats)} formats")
             

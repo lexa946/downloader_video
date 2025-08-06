@@ -817,6 +817,106 @@ body {
     line-height: 1.6;
 }
 
+/* Platform Links */
+.platform-links {
+    padding: 60px 40px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 20px;
+    margin: 40px 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.platform-links::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #667eea, #764ba2, #667eea);
+}
+
+.platform-links h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #2c3e50;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.platform-links > p {
+    text-align: center;
+    margin-bottom: 40px;
+    color: #6c757d;
+    font-size: 1.1rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.platform-links .info-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(102, 126, 234, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.platform-links .info-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+.platform-links .info-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.platform-links .info-card h3 {
+    color: #2c3e50;
+    font-size: 1.4rem;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.platform-links .info-card h3 a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.platform-links .info-card h3 a:hover {
+    color: #667eea;
+    text-decoration: none;
+}
+
+.platform-links .info-card p {
+    color: #6c757d;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.platform-links .info-card p a {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.platform-links .info-card p a:hover {
+    color: #764ba2;
+    text-decoration: underline;
+}
+
 /* Footer */
 .footer {
     background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
@@ -984,8 +1084,23 @@ body {
     .download-section,
     .info-sections,
     .instructions,
-    .history-section {
+    .history-section,
+    .platform-links {
         padding: 30px 20px;
+    }
+    
+    .platform-links h2 {
+        font-size: 1.6rem;
+        margin-bottom: 15px;
+    }
+    
+    .platform-links > p {
+        font-size: 1rem;
+        margin-bottom: 30px;
+    }
+    
+    .platform-links .info-card h3 {
+        font-size: 1.2rem;
     }
     
     /* Mobile footer */
@@ -1100,6 +1215,22 @@ body {
     .badge {
         font-size: 0.8rem;
         padding: 4px 10px;
+    }
+    
+    .platform-links {
+        margin: 20px 0;
+    }
+    
+    .platform-links h2 {
+        font-size: 1.4rem;
+    }
+    
+    .platform-links .info-card {
+        padding: 20px 15px;
+    }
+    
+    .platform-links .info-card h3 {
+        font-size: 1.1rem;
     }
 }
 

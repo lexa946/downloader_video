@@ -31,7 +31,7 @@ async def stream_file(file_path: Path, task: DownloadTask, chunk_size: int = 102
     finally:
         await asyncio.sleep(1)
         file_path.unlink()
-        LOG.info(f"Файл {file_path} удален.")
+        print(f"Файл {file_path} удален.")
         task.video_status.status = VideoDownloadStatus.DONE
         task.video_status.description = VideoDownloadStatus.DONE
 

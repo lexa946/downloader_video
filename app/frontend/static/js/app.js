@@ -435,17 +435,20 @@ async function checkDownloadProgress() {
         if (statusData.status === 'Completed') {
             clearInterval(progressInterval);
             progressInterval = null;
-            console.log('Video completed, starting download...');
-            downloadCompletedFile();
-            refreshHistoryOnComplete();
+            console.log('Video completed download.');
+                    // Показываем кнопку для повторного скачивания
+            if (downloadReadyContainer) {
+                downloadReadyContainer.style.display = 'block';
+            }
+            hideProgress();
         } else if (statusData.status === 'Error') {
             clearInterval(progressInterval);
             progressInterval = null;
             showError(statusData.description || 'Произошла ошибка при скачивании');
             hideProgress();
             showResults();
-            refreshHistoryOnComplete();
         }
+        refreshHistoryOnComplete();
         
     } catch (error) {
         console.error('Error checking progress:', error);
@@ -485,23 +488,19 @@ async function downloadCompletedFile() {
     console.log(`Starting automatic download for task: ${currentTaskId}`);
     
     try {
-        const downloadUrl = `/api/get-video/${currentTaskId}`;
+         const downloadUrl = `/api/get-video/${currentTaskId}`;
 
 
         console.log('Trying direct link method...');
         window.open(downloadUrl, '_blank');
 
         showSuccess('Файл готов к скачиванию! Проверьте загрузки браузера.');
-        
-        // Показываем кнопку для повторного скачивания
-        if (downloadReadyContainer) {
-            downloadReadyContainer.style.display = 'block';
-        }
+
         
         // Показываем возможность скачать снова
         setTimeout(() => {
-            hideProgress();
             showResults();
+            downloadReadyContainer.style.display = 'none';
         }, 2000);
         
     } catch (error) {

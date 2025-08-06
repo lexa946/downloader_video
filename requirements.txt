@@ -12,3 +12,4 @@ aiohttp
 aiofiles
 lxml
 beautifulsoup4
+redis==5.0.1

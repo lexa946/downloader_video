@@ -79,6 +79,7 @@ class InstagramParser(BaseParser):
             is_audio_only = not download_video.video_format_id
 
             task.video_status.description = "Downloading video track" if not is_audio_only else "Downloading audio track"
+            DOWNLOAD_TASKS[task_id] = task
             async with session.get(video.content_url, headers=self.headers, cookies=self.cookies) as response:
                 response.raise_for_status()
 
@@ -97,9 +98,11 @@ class InstagramParser(BaseParser):
                         await f.write(chunk)
                         bytes_read += len(chunk)
                         task.video_status.percent = int((bytes_read / total_size) * 100)
+                        DOWNLOAD_TASKS[task_id] = task
 
                 if is_audio_only:
                     task.video_status.description = "Converting to MP3"
+                    DOWNLOAD_TASKS[task_id] = task
                     mp3_path = download_path.with_suffix('.mp3')
                     await asyncio.to_thread(convert_to_mp3,
                                         temp_path.as_posix(),
@@ -112,6 +115,7 @@ class InstagramParser(BaseParser):
 
         task.video_status.status = VideoDownloadStatus.COMPLETED
         task.video_status.description = VideoDownloadStatus.COMPLETED
+        DOWNLOAD_TASKS[task_id] = task
 
     @staticmethod
     def _parse_video_attributes(content: str) -> InstagramVideo:

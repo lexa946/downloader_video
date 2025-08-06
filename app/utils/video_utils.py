@@ -10,7 +10,7 @@ from Crypto.Util.py3compat import BytesIO
 
 from app.config import settings
 from app.models.status import VideoDownloadStatus
-from app.models.storage import DownloadTask
+from app.models.storage import DownloadTask, DOWNLOAD_TASKS
 from app.s3.client import s3_client
 
 LOG = getLogger()
@@ -24,6 +24,7 @@ else:
 
 
 async def stream_file(file_path: Path, task: DownloadTask, chunk_size: int = 1024 * 1024):
+    task_id = task.video_status.task_id
     try:
         async with aiofiles.open(file_path, "rb") as file:
             while chunk := await file.read(chunk_size):
@@ -34,6 +35,7 @@ async def stream_file(file_path: Path, task: DownloadTask, chunk_size: int = 102
         print(f"Video Utils: stream_file = {file_path} is deleted.")
         task.video_status.status = VideoDownloadStatus.DONE
         task.video_status.description = VideoDownloadStatus.DONE
+        DOWNLOAD_TASKS[task_id] = task  # Update task in Redis
 
 
 async def save_preview_on_s3(preview_url: str, key: str, folder: str = None) -> str:

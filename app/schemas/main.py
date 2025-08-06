@@ -33,7 +33,7 @@ class SVideoResponse(BaseModel):
 class SVideoStatus(BaseModel):
     task_id: str
     status: str
-    description: str = field(default=None)
+    description: Optional[str] = field(default=None)
     percent: float = field(default=0)
     video: SVideoResponse
 

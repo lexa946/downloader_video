@@ -27,12 +27,14 @@ class YouTubeParser(BaseParser):
             bytes_received = stream_.filesize - bytes_remaining
             percent = round(100.0 * bytes_received / float(stream_.filesize), 1)
             task.video_status.percent = float(percent)
+            DOWNLOAD_TASKS[task_id] = task  # Update task in Redis
 
         self._yt.register_on_progress_callback(post_process_hook)
         try:
             # Если video_format_id пустой, скачиваем только аудио
             if not download_video.video_format_id:
                 task.video_status.description = "Downloading audio track"
+                DOWNLOAD_TASKS[task_id] = task
                 audio_path = Path(await asyncio.to_thread(
                     self._yt.streams.get_by_itag(download_video.audio_format_id).download,
                     output_path=download_path.as_posix(),
@@ -41,6 +43,7 @@ class YouTubeParser(BaseParser):
                 
                 # Конвертируем в MP3
                 task.video_status.description = "Converting to MP3"
+                DOWNLOAD_TASKS[task_id] = task
                 out_path = audio_path.with_suffix('.mp3')
                 await asyncio.to_thread(convert_to_mp3,
                                     audio_path.as_posix(),
@@ -52,6 +55,7 @@ class YouTubeParser(BaseParser):
             else:
                 # Стандартная логика для видео
                 task.video_status.description = "Downloading video track"
+                DOWNLOAD_TASKS[task_id] = task
                 video_path = Path(await asyncio.to_thread(
                     self._yt.streams.get_by_itag(download_video.video_format_id).download,
                     output_path=download_path.as_posix(),
@@ -59,12 +63,14 @@ class YouTubeParser(BaseParser):
                 ))
                 if download_video.audio_format_id != download_video.video_format_id:
                     task.video_status.description = "Downloading audio track"
+                    DOWNLOAD_TASKS[task_id] = task
                     audio_path = Path(await asyncio.to_thread(
                         self._yt.streams.get_by_itag(download_video.audio_format_id).download,
                         output_path=download_path.as_posix(),
                         filename_prefix=f"{task_id}_audio_"
                     ))
                     task.video_status.description = "Merging tracks"
+                    DOWNLOAD_TASKS[task_id] = task
                     out_path = video_path.with_name(video_path.stem + "_out.mp4")
                     await asyncio.to_thread(combine_audio_and_video,
                                             video_path.as_posix(),
@@ -78,10 +84,12 @@ class YouTubeParser(BaseParser):
 
             task.video_status.status = VideoDownloadStatus.COMPLETED
             task.video_status.description = VideoDownloadStatus.COMPLETED
+            DOWNLOAD_TASKS[task_id] = task
 
         except Exception as e:
             task.video_status.status = VideoDownloadStatus.ERROR
             task.video_status.description = str(e)
+            DOWNLOAD_TASKS[task_id] = task
 
 
     @staticmethod

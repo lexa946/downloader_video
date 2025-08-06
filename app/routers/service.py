@@ -108,9 +108,10 @@ async def get_downloaded_video(task_id: Annotated[str, Path()]):
             detail="The file does not exist."
         )
     filename = quote(task.filepath.stem[43:])
+    extension = task.filepath.suffix  # Получаем расширение файла (.mp4 или .mp3)
     
     headers = {
-        "Content-Disposition": f"attachment; filename={filename}.mp4",
+        "Content-Disposition": f"attachment; filename={filename}{extension}",
         "Content-Length": str(task.filepath.stat().st_size),
         "Cache-Control": "no-cache",
         "Accept-Ranges": "bytes",

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from app.config import settings
 from app.models.status import VideoDownloadStatus
-from app.models.storage import DOWNLOAD_TASKS, DownloadTask
+from app.models.types import DownloadTask
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
 from app.utils.helpers import remove_all_spec_chars
@@ -143,7 +143,7 @@ class VkParser(BaseParser):
 
             is_audio_only = not download_video.video_format_id
             extension = '.mp3' if is_audio_only else '.mp4'
-            
+
             download_path = (
                     Path(settings.DOWNLOAD_FOLDER) /
                     remove_all_spec_chars(video.author) /
@@ -176,7 +176,7 @@ class VkParser(BaseParser):
 
             task.video_status.description = "Merging parts"
             await self._merge_parts(part_files, temp_path)
-            
+
             if is_audio_only:
                 task.video_status.description = "Converting to MP3"
                 await asyncio.to_thread(convert_to_mp3,
@@ -230,7 +230,7 @@ class VkParser(BaseParser):
                     }
                 )
             )
-            
+
             print(f"VK Parser: Created {len(available_formats)} formats")
             
             return SVideoResponse(

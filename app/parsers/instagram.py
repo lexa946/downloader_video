@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup
 
 from app.config import settings
 from app.models.status import VideoDownloadStatus
-from app.models.storage import DOWNLOAD_TASKS, DownloadTask
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
 from app.utils.video_utils import save_preview_on_s3, convert_to_mp3
@@ -78,7 +77,7 @@ class InstagramParser(BaseParser):
             download_path.parent.mkdir(parents=True, exist_ok=True)
 
             is_audio_only = not download_video.video_format_id
-            
+
             task.video_status.description = "Downloading video track" if not is_audio_only else "Downloading audio track"
             async with session.get(video.content_url, headers=self.headers, cookies=self.cookies) as response:
                 response.raise_for_status()
@@ -86,10 +85,10 @@ class InstagramParser(BaseParser):
                 total_size = int(response.headers.get('Content-Length', 0))
                 bytes_read = 0
                 temp_path = download_path
-                
+
                 if is_audio_only:
                     temp_path = download_path.with_suffix('.temp')
-                
+
                 async with aiofiles.open(temp_path, 'wb') as f:
                     while True:
                         chunk = await response.content.read(8192)  # читаем по 8 КБ
@@ -146,8 +145,8 @@ class InstagramParser(BaseParser):
                 **{
                     "quality": "Audio only",
                     "video_format_id": "",
-                    "audio_format_id": "audio",
-                    "filesize": video.size // 4,
+                    "audio_format_id": "",
+                    "filesize": video.size,
                 }
             )
         ]

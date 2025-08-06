@@ -1,33 +1,28 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Скачать видео бесплатно онлайн - YouTube, Instagram, VK | Video Downloader</title>
+{% extends 'base.html' %}
+{% block title %}
+    Скачать видео бесплатно онлайн - YouTube, Instagram, VK | Video Downloader
+{% endblock %}
+{% block head %}
     <meta name="description" content="Бесплатный онлайн сервис для скачивания видео с YouTube, Instagram, VK, VK Video. Без регистрации, в высоком качестве до 4K. Поддержка MP4, MP3 форматов.">
     <meta name="keywords" content="скачать видео, youtube downloader, instagram downloader, vk downloader, vkvideo downloader, скачать с ютуба, скачать с инстаграм, видео скачивальщик">
-    <meta name="robots" content="index, follow">
+
     <meta name="author" content="Video Downloader">
-    
+
     <!-- Open Graph meta tags -->
     <meta property="og:title" content="Скачать видео бесплатно онлайн - YouTube, Instagram, VK">
     <meta property="og:description" content="Бесплатный сервис для скачивания видео с YouTube, Instagram, VK, VK Video. Без регистрации, высокое качество до 4K.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://downloader.pozharsite.ru/">
     <meta property="og:image" content="https://downloader.pozharsite.ru/static/images/favicon.png">
-    
+
     <!-- Twitter Card meta tags -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Скачать видео бесплатно онлайн">
     <meta name="twitter:description" content="Бесплатный сервис для скачивания видео с YouTube, Instagram, VK, VK Video">
-    
+
     <!-- Canonical URL -->
     <link rel="canonical" href="https://downloader.pozharsite.ru/">
-    
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="/favicon.ico">
-    <link rel="apple-touch-icon" href="/new/static/images/favicon.png">
-    
+
     <!-- Structured Data -->
     <script type="application/ld+json">
     {
@@ -45,7 +40,7 @@
       },
       "featureList": [
         "Скачивание с YouTube",
-        "Скачивание с Instagram", 
+        "Скачивание с Instagram",
         "Скачивание с VK",
         "Скачивание с VK Video",
         "Поддержка HD качества",
@@ -54,57 +49,19 @@
       ]
     }
     </script>
-    
-    <link rel="stylesheet" href="/new/static/css/styles.css">
-</head>
-<body>
-    <div class="container">
-        <header class="header">
-            <nav class="navbar">
-                <div class="nav-brand">
-                    <a href="/new/" class="brand-link">
-                        <span class="brand-icon">📥</span>
-                        <span class="brand-text">Video Downloader</span>
-                    </a>
-                    <p class="brand-tagline">Скачать видео бесплатно онлайн</p>
-                </div>
-                
-                <button class="nav-toggle" id="navToggle" aria-label="Открыть меню">
-                    <span class="hamburger"></span>
-                    <span class="hamburger"></span>
-                    <span class="hamburger"></span>
-                </button>
-                
-                <div class="nav-menu" id="navMenu">
-                    <ul class="nav-list">
-                        <li class="nav-item">
-                            <a href="/new/" class="nav-link active">Главная</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/new/faq" class="nav-link">FAQ</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/new/privacy" class="nav-link">Конфиденциальность</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/new/terms" class="nav-link">Условия</a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-        </header>
-
-        <main class="main">
+{% endblock %}
+{% block content %}
+	<main class="main">
             <section class="hero">
                 <h2>Скачивайте видео с любимых платформ</h2>
-                <p class="subtitle">Поддерживаем YouTube, Instagram, VK, VK Video. Без регистрации, в высоком качестве до 4K</p>
-                
+                <p class="subtitle">Поддерживаем YouTube, Instagram, VK, VK Video. Без регистрации, в высоком качестве.</p>
+
                 <!-- Качества для SEO -->
                 <div class="quality-badges">
-                    <span class="badge">4K</span>
                     <span class="badge">1080p</span>
                     <span class="badge">720p</span>
                     <span class="badge">480p</span>
+                    <span class="badge">360p</span>
                     <span class="badge">MP3</span>
                 </div>
             </section>
@@ -112,10 +69,10 @@
             <section class="download-section">
                 <div class="url-input-container">
                     <div class="input-wrapper">
-                        <input 
-                            type="url" 
-                            id="videoUrl" 
-                            placeholder="Вставьте ссылку на видео (YouTube, Instagram, VK, VK Video)" 
+                        <input
+                            type="url"
+                            id="videoUrl"
+                            placeholder="Вставьте ссылку на видео (YouTube, Instagram, VK, VK Video)"
                             class="url-input"
                             aria-label="Ссылка на видео для скачивания"
                         >
@@ -128,7 +85,7 @@
                         <span class="btn-loader" style="display: none;">⏳</span>
                     </button>
                 </div>
-                
+
                 <!-- Поддерживаемые платформы -->
                 <div class="platforms">
                     <p>Поддерживаемые платформы:</p>
@@ -165,14 +122,14 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="formats-container">
                     <h4>Выберите качество и формат:</h4>
                     <div id="formatsList" class="formats-list">
                         <!-- Форматы будут загружены динамически -->
                     </div>
                 </div>
-                
+
                 <!-- Кнопка для скачивания готового файла -->
                 <div id="downloadReadyContainer" class="download-ready-container" style="display: none;">
                     <div class="download-ready-message">
@@ -201,7 +158,7 @@
             <section id="historySection" class="history-section" style="display: none;">
                 <div class="history-header">
                     <h3>📋 История скачивания</h3>
-                    <p>Ваши последние 5 скачиваний</p>
+                    <p>Ваши последние 6 скачиваний</p>
                 </div>
                 <div id="historyList" class="history-list">
                     <!-- История будет загружена динамически -->
@@ -261,23 +218,5 @@
                 </div>
             </section>
         </main>
-
-        <footer class="footer">
-            <div class="container">
-            <div class="footer-content">
-                <div class="footer-links">
-                    <a href="/new/faq">❓ FAQ</a>
-                    <a href="/new/privacy">🔒 Конфиденциальность</a>
-                    <a href="/new/terms">📄 Условия</a>
-                </div>
-                <div class="footer-info">
-                    <p>🎬 Бесплатный сервис для скачивания видео с YouTube, Instagram, VK</p>
-                    <p>&copy; 2024 Video Downloader</p>
-                </div>
-            </div>
-        </footer>
-    </div>
-
-    <script src="/new/static/js/app.js"></script>
-</body>
-</html>
+    <script src="/static/js/app.js"></script>
+{% endblock %}

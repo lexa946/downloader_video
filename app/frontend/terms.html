@@ -1,16 +1,10 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Условия использования - Video Downloader</title>
+{% extends 'base.html' %}
+{% block title %}
+    Условия использования - Video Downloader
+{% endblock %}
+{% block head %}
     <meta name="description" content="Условия использования сервиса Video Downloader. Правила скачивания видео с YouTube, Instagram, VK.">
-    <meta name="robots" content="index, follow">
-    
     <link rel="canonical" href="https://downloader.pozharsite.ru/terms">
-    <link rel="icon" type="image/png" href="/favicon.ico">
-    <link rel="stylesheet" href="/new/static/css/styles.css">
-    
     <style>
         .terms-container {
             max-width: 800px;
@@ -20,39 +14,39 @@
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
-        
+
         .terms-section {
             margin-bottom: 40px;
         }
-        
+
         .terms-section h2 {
             color: #2c3e50;
             margin-bottom: 20px;
             font-size: 1.5rem;
         }
-        
+
         .terms-section h3 {
             color: #3498db;
             margin-bottom: 15px;
             font-size: 1.2rem;
         }
-        
+
         .terms-section p {
             color: #7f8c8d;
             line-height: 1.6;
             margin-bottom: 15px;
         }
-        
+
         .terms-section ul {
             color: #7f8c8d;
             margin-left: 20px;
             margin-bottom: 15px;
         }
-        
+
         .terms-section ul li {
             margin-bottom: 8px;
         }
-        
+
         .back-link {
             display: inline-block;
             margin-bottom: 30px;
@@ -60,17 +54,17 @@
             text-decoration: none;
             font-weight: 500;
         }
-        
+
         .back-link:hover {
             text-decoration: underline;
         }
-        
+
         .last-updated {
             font-style: italic;
             color: #95a5a6;
             margin-bottom: 30px;
         }
-        
+
         .important-notice {
             background: #fff3cd;
             border: 1px solid #ffeaa7;
@@ -78,70 +72,35 @@
             padding: 20px;
             margin: 20px 0;
         }
-        
+
         .important-notice h4 {
             color: #856404;
             margin-bottom: 10px;
         }
-        
+
         .important-notice p {
             color: #856404;
             margin: 0;
         }
     </style>
-</head>
-<body>
-    <div class="container">
-        <header class="header">
-            <nav class="navbar">
-                <div class="nav-brand">
-                    <a href="/new/" class="brand-link">
-                        <span class="brand-icon">📥</span>
-                        <span class="brand-text">Video Downloader</span>
-                    </a>
-                    <p class="brand-tagline">Скачать видео бесплатно онлайн</p>
-                </div>
-                
-                <button class="nav-toggle" id="navToggle" aria-label="Открыть меню">
-                    <span class="hamburger"></span>
-                    <span class="hamburger"></span>
-                    <span class="hamburger"></span>
-                </button>
-                
-                <div class="nav-menu" id="navMenu">
-                    <ul class="nav-list">
-                        <li class="nav-item">
-                            <a href="/new/" class="nav-link">Главная</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/new/faq" class="nav-link">FAQ</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/new/privacy" class="nav-link">Конфиденциальность</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/new/terms" class="nav-link active">Условия</a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-        </header>
-        
-        <div class="terms-container">
-            
+{% endblock %}
+
+{% block content %}
+    <div class="terms-container">
+
             <h1>Условия использования</h1>
             <p class="last-updated">Последнее обновление: 1 января 2024 г.</p>
-            
+
             <div class="important-notice">
                 <h4>⚠️ Важное уведомление об авторских правах</h4>
                 <p>Пользователи несут полную ответственность за соблюдение авторских прав при скачивании контента. Скачивайте только те видео, на которые у вас есть права или которые распространяются свободно.</p>
             </div>
-            
+
             <div class="terms-section">
                 <h2>1. Принятие условий</h2>
                 <p>Используя сервис Video Downloader, вы автоматически соглашаетесь с настоящими Условиями использования. Если вы не согласны с какими-либо условиями, пожалуйста, не используйте наш сервис.</p>
             </div>
-            
+
             <div class="terms-section">
                 <h2>2. Описание сервиса</h2>
                 <p>Video Downloader - это бесплатный веб-сервис, позволяющий пользователям скачивать видео с популярных платформ:</p>
@@ -152,7 +111,7 @@
                 </ul>
                 <p>Сервис предоставляется "как есть" без каких-либо гарантий.</p>
             </div>
-            
+
             <div class="terms-section">
                 <h2>3. Разрешенное использование</h2>
                 <p>Вы можете использовать наш сервис для:</p>
@@ -163,7 +122,7 @@
                     <li>Скачивания контента, распространяемого под свободными лицензиями</li>
                 </ul>
             </div>
-            
+
             <div class="terms-section">
                 <h2>4. Запрещенное использование</h2>
                 <p>Запрещается использовать сервис для:</p>
@@ -176,10 +135,10 @@
                     <li>Попыток взлома или нарушения работы сервиса</li>
                 </ul>
             </div>
-            
+
             <div class="terms-section">
                 <h2>5. Авторские права</h2>
-                
+
                 <h3>5.1 Ответственность пользователя</h3>
                 <p>Пользователь несет полную ответственность за:</p>
                 <ul>
@@ -187,11 +146,11 @@
                     <li>Получение необходимых разрешений от правообладателей</li>
                     <li>Использование скачанного контента в соответствии с законом</li>
                 </ul>
-                
+
                 <h3>5.2 Уведомления DMCA</h3>
                 <p>Если вы являетесь правообладателем и считаете, что ваши права нарушены, отправьте уведомление по адресу: dmca@pozharsite.ru</p>
             </div>
-            
+
             <div class="terms-section">
                 <h2>6. Ограничения сервиса</h2>
                 <p>Мы оставляем за собой право:</p>
@@ -202,12 +161,12 @@
                     <li>Изменить функциональность сервиса без предварительного уведомления</li>
                 </ul>
             </div>
-            
+
             <div class="terms-section">
                 <h2>7. Конфиденциальность</h2>
                 <p>Обработка персональных данных регулируется нашей <a href="/privacy">Политикой конфиденциальности</a>, которая является неотъемлемой частью настоящих Условий.</p>
             </div>
-            
+
             <div class="terms-section">
                 <h2>8. Отказ от гарантий</h2>
                 <p>Сервис предоставляется "как есть". Мы не гарантируем:</p>
@@ -218,7 +177,7 @@
                     <li>Сохранность скачанных файлов</li>
                 </ul>
             </div>
-            
+
             <div class="terms-section">
                 <h2>9. Ограничение ответственности</h2>
                 <p>Мы не несем ответственности за:</p>
@@ -229,22 +188,22 @@
                     <li>Действия третьих лиц</li>
                 </ul>
             </div>
-            
+
             <div class="terms-section">
                 <h2>10. Изменение условий</h2>
                 <p>Мы можем изменять настоящие Условия в любое время. Существенные изменения будут объявлены на главной странице сайта. Продолжение использования сервиса после изменений означает ваше согласие с новыми условиями.</p>
             </div>
-            
+
             <div class="terms-section">
                 <h2>11. Прекращение использования</h2>
                 <p>Вы можете прекратить использование сервиса в любое время. Мы также можем прекратить предоставление доступа к сервису при нарушении настоящих Условий.</p>
             </div>
-            
+
             <div class="terms-section">
                 <h2>12. Применимое право</h2>
                 <p>Настоящие Условия регулируются законодательством Российской Федерации. Все споры рассматриваются в соответствии с российским правом.</p>
             </div>
-            
+
             <div class="terms-section">
                 <h2>13. Контактная информация</h2>
                 <p>По вопросам, связанным с настоящими Условиями, обращайтесь:</p>
@@ -254,35 +213,6 @@
                 </ul>
             </div>
         </div>
-    </div>
+{% endblock %}
     
-    <script>
-        // Navigation functions
-        const navToggle = document.getElementById('navToggle');
-        const navMenu = document.getElementById('navMenu');
-        
-        if (navToggle && navMenu) {
-            navToggle.addEventListener('click', function() {
-                navMenu.classList.toggle('active');
-                navToggle.classList.toggle('active');
-            });
-            
-            // Close menu when clicking outside
-            document.addEventListener('click', function(e) {
-                if (!navToggle.contains(e.target) && !navMenu.contains(e.target)) {
-                    navMenu.classList.remove('active');
-                    navToggle.classList.remove('active');
-                }
-            });
-            
-            // Close on escape key
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    navMenu.classList.remove('active');
-                    navToggle.classList.remove('active');
-                }
-            });
-        }
-    </script>
-</body>
-</html>
+

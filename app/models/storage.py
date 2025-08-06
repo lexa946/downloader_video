@@ -26,5 +26,5 @@ class DownloadTasks:
 
 
 DOWNLOAD_TASKS = DownloadTasks()
-USER_TASKS = defaultdict(lambda: deque(maxlen=5))
+USER_TASKS = defaultdict(lambda: deque(maxlen=6))
 VIDEO_META_CACHE = {}

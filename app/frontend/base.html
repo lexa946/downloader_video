@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="index, follow">
+
+    <title>{% block title %}Video Downloader{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    {% block head %}
+
+    {% endblock %}
+    
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    <link rel="apple-touch-icon" href="/static/images/favicon.png">
+    <!-- Yandex.RTB -->
+    <script>window.yaContextCb=window.yaContextCb||[]</script>
+    <script src="https://yandex.ru/ads/system/context.js" async></script>
+</head>
+<body>
+
+<div class="container">
+    {% include 'header.html' %}
+    {% block content %}
+    	
+    {% endblock %}
+    {% include 'footer.html' %}
+<!-- Yandex.RTB R-A-16518515-4 -->
+<script>
+window.yaContextCb.push(() => {
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-16518515-4",
+        "type": "floorAd",
+        "platform": "touch"
+    })
+})
+</script>
+<!-- Yandex.RTB R-A-16518515-3 -->
+<script>
+window.yaContextCb.push(() => {
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-16518515-3",
+        "type": "floorAd",
+        "platform": "desktop"
+    })
+})
+</script>
+<!-- Yandex.RTB R-A-16518515-2 -->
+<script>
+window.yaContextCb.push(() => {
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-16518515-2",
+        "type": "fullscreen",
+        "platform": "desktop"
+    })
+})
+</script>
+<!-- Yandex.RTB R-A-16518515-1 -->
+<script>
+window.yaContextCb.push(() => {
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-16518515-1",
+        "type": "fullscreen",
+        "platform": "touch"
+    })
+})
+</script>
+</div>
+</body>
+</html>

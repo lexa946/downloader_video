@@ -90,13 +90,13 @@ async def get_download_status(task_id: Annotated[str, Path()]) -> SVideoStatus:
     return DOWNLOAD_TASKS[task_id].video_status
 
 
-@router.api_route("/get-video/{task_id}", methods=["GET", "HEAD"])
+@router.get("/get-video/{task_id}")
 @check_task_id
-async def get_downloaded_video(request: Request, task_id: Annotated[str, Path()]):
+async def get_downloaded_video(task_id: Annotated[str, Path()]):
     """Отдает файл, если он скачан"""
     task: DownloadTask = DOWNLOAD_TASKS[task_id]
 
-    if task.video_status.status != VideoDownloadStatus.COMPLETED:
+    if task.video_status.status == VideoDownloadStatus.PENDING:
         raise HTTPException(
             status_code=status.HTTP_406_NOT_ACCEPTABLE,
             detail="The file is not ready."
@@ -107,7 +107,7 @@ async def get_downloaded_video(request: Request, task_id: Annotated[str, Path()]
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The file does not exist."
         )
-    filename = quote(task.filepath.stem)[43:]
+    filename = quote(task.filepath.stem[43:])
     
     headers = {
         "Content-Disposition": f"attachment; filename={filename}.mp4",
@@ -115,15 +115,6 @@ async def get_downloaded_video(request: Request, task_id: Annotated[str, Path()]
         "Cache-Control": "no-cache",
         "Accept-Ranges": "bytes",
     }
-
-    # Для HEAD запросов возвращаем только заголовки
-    if request.method == "HEAD":
-        return Response(
-            headers=headers,
-            media_type="application/octet-stream"
-        )
-    
-    # Для GET запросов возвращаем файл
     return StreamingResponse(
         stream_file(task.filepath, task),
         media_type="application/octet-stream",

@@ -74,8 +74,10 @@ app/new_frontend/
 ## Установка и запуск
 
 1. Добавить роутер в main.py:
+
 ```python
-from app.routers.new_front import router as new_front_router
+from app.routers.front import router as new_front_router
+
 app.include_router(new_front_router)
 ```
 

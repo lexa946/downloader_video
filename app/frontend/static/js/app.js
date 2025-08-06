@@ -35,6 +35,9 @@ const clearInputBtn = document.getElementById('clearInput');
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
+
+    setActiveNavigation();
+
     // Video functionality
     if (analyzeBtn) {
         analyzeBtn.addEventListener('click', handleAnalyzeVideo);
@@ -429,7 +432,7 @@ async function checkDownloadProgress() {
         const statusData = await response.json();
         
         updateProgressDisplay(statusData);
-        console.log('Status data:', statusData);
+
         if (statusData.status === 'Completed') {
             clearInterval(progressInterval);
             progressInterval = null;
@@ -484,74 +487,11 @@ async function downloadCompletedFile() {
     
     try {
         const downloadUrl = `/api/get-video/${currentTaskId}`;
-        console.log(`Download URL: ${downloadUrl}`);
-        
-        // Метод 1: Прямая ссылка (простой способ)
+
+
         console.log('Trying direct link method...');
         window.open(downloadUrl, '_blank');
-        
-        // Метод 2: Fetch + Blob (резервный способ)
-        setTimeout(async () => {
-            try {
-                console.log('Trying fetch + blob method...');
-                const response = await fetch(downloadUrl);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const blob = await response.blob();
-                console.log('Blob created, size:', blob.size);
-                
-                // Получаем имя файла из заголовков
-                const contentDisposition = response.headers.get('Content-Disposition');
-                let filename = 'video.mp4';
-                if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename[^;=\\n]*=((['"]).*?\\2|[^;\\n]*)/);
-                    if (filenameMatch) {
-                        filename = filenameMatch[1].replace(/['"]/g, '');
-                    }
-                }
-                
-                console.log('Creating download link with filename:', filename);
-                
-                // Создаем объект URL для blob
-                const blobUrl = window.URL.createObjectURL(blob);
-                
-                // Создаем ссылку для скачивания
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.download = filename;
-                link.style.display = 'none';
-                
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                // Освобождаем память
-                window.URL.revokeObjectURL(blobUrl);
-                
-                console.log('Download triggered successfully via blob method');
-                
-            } catch (blobError) {
-                console.error('Blob download failed:', blobError);
-                
-                // Метод 3: Простая ссылка как последний резерв
-                console.log('Trying simple link method...');
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.download = '';
-                link.target = '_blank';
-                link.style.display = 'none';
-                
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                console.log('Simple link method triggered');
-            }
-        }, 500);
-        
+
         showSuccess('Файл готов к скачиванию! Проверьте загрузки браузера.');
         
         // Показываем кнопку для повторного скачивания
@@ -692,7 +632,6 @@ async function loadUserHistory() {
     
     try {
         const response = await fetch(`/user/${userId}/history`);
-        
         if (!response.ok) {
             // If user not found or no history, hide section
             if (response.status === 404) {
@@ -704,11 +643,19 @@ async function loadUserHistory() {
         const historyData = await response.json();
         
         if (historyData.history && historyData.history.length > 0) {
-            displayHistory(historyData.history);
+            console.log("here 1");
+            const history = historyData.history;
+            history.reverse();
+            displayHistory(history);
             if (historySection) {
                 historySection.style.display = 'block';
                 historySection.classList.add('fade-in');
             }
+        } else {
+            console.log("here 2");
+            historySection.style.display = 'block';
+            historySection.classList.add('fade-in');
+            historyEmpty.style.display = 'block';
         }
         
     } catch (error) {
@@ -794,16 +741,18 @@ function getStatusInfo(status) {
 
 function createHistoryActions(videoStatus) {
     let actions = '';
+
+    const status = videoStatus.status.toLowerCase();
     
-    if (videoStatus.status === 'completed') {
+    if (status === 'completed') {
         actions += `
             <button class="history-btn download" onclick="downloadHistoryFile('${videoStatus.task_id}')">
-                <span>📥</span> Скачать
+                <span>📥</span> Скачать файл
             </button>
         `;
     }
     
-    if (videoStatus.status === 'error' || videoStatus.status === 'completed') {
+    if (status === 'error' || status === 'done') {
         actions += `
             <button class="history-btn redownload" onclick="redownloadVideo('${videoStatus.video.url}')">
                 <span>🔄</span> Заново
@@ -811,10 +760,10 @@ function createHistoryActions(videoStatus) {
         `;
     }
     
-    if (videoStatus.status === 'downloading' || videoStatus.status === 'pending' || videoStatus.status === 'processing') {
+    if (status === 'pending') {
         actions += `
             <button class="history-btn info" onclick="checkHistoryStatus('${videoStatus.task_id}')">
-                <span>ℹ️</span> Статус
+                <span>ℹ️</span> Загрузка
             </button>
         `;
     }
@@ -826,16 +775,10 @@ async function downloadHistoryFile(taskId) {
     try {
         // Create download link
         const downloadUrl = `/api/get-video/${taskId}`;
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = '';
-        link.style.display = 'none';
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        window.open(downloadUrl, '_blank');
         
         showSuccess('Файл начал скачиваться!');
+        await loadUserHistory();
         
     } catch (error) {
         console.error('Error downloading file:', error);
@@ -883,7 +826,7 @@ async function checkHistoryStatus(taskId) {
         alert(message);
         
         // Refresh history if status changed
-        loadUserHistory();
+        await loadUserHistory();
         
     } catch (error) {
         console.error('Error checking status:', error);

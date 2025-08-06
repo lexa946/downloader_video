@@ -66,7 +66,15 @@
             {% endblock %}
 
         </section>
-
+        <!-- Кнопка для скачивания готового файла -->
+        <section id="downloadReadyContainer" class="download-ready-container" style="display: none;">
+            <div class="download-ready-message">
+                <h4>✅ Файл готов к скачиванию!</h4>
+                <button id="downloadReadyBtn" class="download-ready-btn">
+                    📥 Скачать файл
+                </button>
+            </div>
+        </section>
 
         <!-- Результаты анализа -->
         <section id="results" class="results" style="display: none;">
@@ -85,16 +93,6 @@
                 <h4>Выберите качество и формат:</h4>
                 <div id="formatsList" class="formats-list">
                     <!-- Форматы будут загружены динамически -->
-                </div>
-            </div>
-
-            <!-- Кнопка для скачивания готового файла -->
-            <div id="downloadReadyContainer" class="download-ready-container" style="display: none;">
-                <div class="download-ready-message">
-                    <h4>✅ Файл готов к скачиванию!</h4>
-                    <button id="downloadReadyBtn" class="download-ready-btn">
-                        📥 Скачать файл
-                    </button>
                 </div>
             </div>
         </section>

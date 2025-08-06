@@ -1,5 +1,5 @@
 class VideoDownloadStatus:
-    ERROR = "Error"
-    PENDING = "Pending"
-    COMPLETED = "Completed"
-    DONE = "Done"
+    ERROR = "error"
+    PENDING = "pending"
+    COMPLETED = "completed"
+    DONE = "done"

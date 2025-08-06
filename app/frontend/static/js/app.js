@@ -337,8 +337,7 @@ function createFormatElement(format) {
     formatDiv.className = 'format-item';
     
     const isAudioOnly = format.quality.toLowerCase().includes('audio') || 
-                       format.quality.toLowerCase().includes('mp3') ||
-                       !format.video_format_id;
+                       format.quality.toLowerCase().includes('mp3');
     
     const qualityDisplay = isAudioOnly ? 
         `🎵 ${format.quality} (Только аудио)` : 

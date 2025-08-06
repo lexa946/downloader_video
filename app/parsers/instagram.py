@@ -118,8 +118,8 @@ class InstagramParser(BaseParser):
             SVideoFormat(
                 **{
                     "quality": video.quality,
-                    "video_format_id": "",
-                    "audio_format_id": "",
+                    "video_format_id": "1",
+                    "audio_format_id": "1",
                     "filesize": video.size,
                 }
             )

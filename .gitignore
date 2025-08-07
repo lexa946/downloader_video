@@ -6,3 +6,5 @@ ffmpeg
 test.*
 
 cookie*
+.cursorrules
+.cursor/rules/*

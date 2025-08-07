@@ -9,8 +9,10 @@ import aiohttp
 from Crypto.Util.py3compat import BytesIO
 
 from app.config import settings
+from app.models.cache import redis_cache
 from app.models.status import VideoDownloadStatus
-from app.models.storage import DownloadTask, DOWNLOAD_TASKS
+from app.models.types import DownloadTask
+
 from app.s3.client import s3_client
 
 LOG = getLogger()
@@ -32,10 +34,10 @@ async def stream_file(file_path: Path, task: DownloadTask, chunk_size: int = 102
     finally:
         await asyncio.sleep(1)
         file_path.unlink()
-        print(f"Video Utils: stream_file = {file_path} is deleted.")
+        print(f"Video Utils: stream_file - {file_path} is deleted.")
         task.video_status.status = VideoDownloadStatus.DONE
         task.video_status.description = VideoDownloadStatus.DONE
-        DOWNLOAD_TASKS[task_id] = task  # Update task in Redis
+        await redis_cache.set_download_task(task_id, task)
 
 
 async def save_preview_on_s3(preview_url: str, key: str, folder: str = None) -> str:

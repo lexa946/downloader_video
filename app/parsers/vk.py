@@ -8,6 +8,7 @@ import aiohttp
 from dataclasses import dataclass
 
 from app.config import settings
+from app.models.cache import redis_cache
 from app.models.status import VideoDownloadStatus
 from app.models.types import DownloadTask
 from app.parsers.base import BaseParser
@@ -104,7 +105,7 @@ class VkParser(BaseParser):
                     async with self._lock:
                         self.bytes_read += len(chunk)
                         task.video_status.percent = int((self.bytes_read / self.total_size) * 100)
-                        DOWNLOAD_TASKS[task_id] = task  # Update task in Redis
+                        await redis_cache.set_download_task(task_id, task)  # Update task in Redis
                     await f.write(chunk)
         return part_file
 
@@ -137,7 +138,7 @@ class VkParser(BaseParser):
             raise
 
     async def download(self, task_id: str, download_video: SVideoDownload):
-        task: DownloadTask = DOWNLOAD_TASKS[task_id]
+        task: DownloadTask = await redis_cache.get_download_task(task_id)
         async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context)) as session:
             response_json = await self._get_video_info(session)
             video = VkVideo.from_json(response_json)
@@ -154,7 +155,7 @@ class VkParser(BaseParser):
             download_path.parent.mkdir(parents=True, exist_ok=True)
 
             task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
-            DOWNLOAD_TASKS[task_id] = task
+            await redis_cache.set_download_task(task_id, task)
 
             content_url = video.content_urls[download_video.audio_format_id]
 
@@ -177,12 +178,12 @@ class VkParser(BaseParser):
             part_files = await asyncio.gather(*tasks)
 
             task.video_status.description = "Merging parts"
-            DOWNLOAD_TASKS[task_id] = task
+            await redis_cache.set_download_task(task_id, task)
             await self._merge_parts(part_files, temp_path)
 
             if is_audio_only:
                 task.video_status.description = "Converting to MP3"
-                DOWNLOAD_TASKS[task_id] = task
+                await redis_cache.set_download_task(task_id, task)
                 await asyncio.to_thread(convert_to_mp3,
                                     temp_path.as_posix(),
                                     download_path.as_posix()
@@ -194,7 +195,7 @@ class VkParser(BaseParser):
 
         task.video_status.status = VideoDownloadStatus.COMPLETED
         task.video_status.description = VideoDownloadStatus.COMPLETED
-        DOWNLOAD_TASKS[task_id] = task
+        await redis_cache.set_download_task(task_id, task)
 
     async def get_formats(self) -> SVideoResponse:
         try:

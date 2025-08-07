@@ -8,7 +8,10 @@ from dataclasses import dataclass
 from bs4 import BeautifulSoup
 
 from app.config import settings
+from app.models.cache import redis_cache
 from app.models.status import VideoDownloadStatus
+from app.models.types import DownloadTask
+
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
 from app.utils.video_utils import save_preview_on_s3, convert_to_mp3
@@ -66,7 +69,7 @@ class InstagramParser(BaseParser):
         self._response_text = None
 
     async def download(self, task_id: str, download_video: SVideoDownload):
-        task: DownloadTask = DOWNLOAD_TASKS[task_id]
+        task: DownloadTask = await redis_cache.get_download_task(task_id)
         async with aiohttp.ClientSession() as session:
             async with session.get(self.url, headers=self.headers, cookies=self.cookies) as response:
                 response.raise_for_status()
@@ -79,7 +82,7 @@ class InstagramParser(BaseParser):
             is_audio_only = not download_video.video_format_id
 
             task.video_status.description = "Downloading video track" if not is_audio_only else "Downloading audio track"
-            DOWNLOAD_TASKS[task_id] = task
+            await redis_cache.set_download_task(task_id, task)
             async with session.get(video.content_url, headers=self.headers, cookies=self.cookies) as response:
                 response.raise_for_status()
 
@@ -98,11 +101,11 @@ class InstagramParser(BaseParser):
                         await f.write(chunk)
                         bytes_read += len(chunk)
                         task.video_status.percent = int((bytes_read / total_size) * 100)
-                        DOWNLOAD_TASKS[task_id] = task
+                        await redis_cache.set_download_task(task_id, task)
 
                 if is_audio_only:
                     task.video_status.description = "Converting to MP3"
-                    DOWNLOAD_TASKS[task_id] = task
+                    await redis_cache.set_download_task(task_id, task)
                     mp3_path = download_path.with_suffix('.mp3')
                     await asyncio.to_thread(convert_to_mp3,
                                         temp_path.as_posix(),
@@ -115,7 +118,7 @@ class InstagramParser(BaseParser):
 
         task.video_status.status = VideoDownloadStatus.COMPLETED
         task.video_status.description = VideoDownloadStatus.COMPLETED
-        DOWNLOAD_TASKS[task_id] = task
+        await redis_cache.set_download_task(task_id, task)
 
     @staticmethod
     def _parse_video_attributes(content: str) -> InstagramVideo:
@@ -149,8 +152,8 @@ class InstagramParser(BaseParser):
                 **{
                     "quality": "Audio only",
                     "video_format_id": "",
-                    "audio_format_id": "",
-                    "filesize": video.size,
+                    "audio_format_id": "audio",
+                    "filesize": video.size // 4,
                 }
             )
         ]

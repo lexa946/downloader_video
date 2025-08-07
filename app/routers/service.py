@@ -11,8 +11,9 @@ from starlette import status
 
 from app.models.services import VideoServicesManager
 from app.models.status import VideoDownloadStatus
-from app.models.storage import DownloadTask, DOWNLOAD_TASKS
+
 from app.models.cache import redis_cache
+from app.models.types import DownloadTask
 from app.schemas.defaults import EMPTY_VIDEO_RESPONSE
 from app.schemas.main import SVideoResponse, SVideoRequest, SVideoDownload, SVideoStatus
 from app.utils.validators_utils import check_task_id
@@ -29,7 +30,7 @@ async def get_video_formats(video_request: SVideoRequest) -> SVideoResponse:
         print(f"Service: Processing URL: {video_request.url}")
         
         # Try to get from Redis cache
-        cached_formats = redis_cache.get_video_meta(video_request.url)
+        cached_formats = await redis_cache.get_video_meta(video_request.url)
         if cached_formats:
             print(f"Service: Found in cache")
             return cached_formats
@@ -54,7 +55,7 @@ async def get_video_formats(video_request: SVideoRequest) -> SVideoResponse:
             )
             
         # Store in Redis cache
-        redis_cache.set_video_meta(video_request.url, available_formats)
+        await redis_cache.set_video_meta(video_request.url, available_formats)
         print(f"Service: Successfully cached and returning {len(available_formats.formats)} formats")
         return available_formats
         
@@ -76,20 +77,20 @@ async def start_download(request: Request, video_download: SVideoDownload, backg
     user_id = request.cookies.get("user_id", "0")
     task_id = str(uuid.uuid4())
     # Get video metadata from cache or fetch it
-    video_meta = redis_cache.get_video_meta(video_download.url)
+    video_meta = await redis_cache.get_video_meta(video_download.url)
     if not video_meta:
         service = VideoServicesManager.get_service(video_download.url)
         parser_instance = service.parser(video_download.url)
         video_meta = await parser_instance.get_formats()
-        redis_cache.set_video_meta(video_download.url, video_meta)
+        await redis_cache.set_video_meta(video_download.url, video_meta)
 
     video_status = SVideoStatus(
         task_id=task_id,
         status=VideoDownloadStatus.PENDING,
         video=video_meta or EMPTY_VIDEO_RESPONSE
     )
-    DOWNLOAD_TASKS[task_id] = DownloadTask(video_status)
-    redis_cache.add_user_task(user_id, task_id)
+    await redis_cache.set_download_task(task_id, DownloadTask(video_status))
+    await redis_cache.add_user_task(user_id, task_id)
 
     service = VideoServicesManager.get_service(video_download.url)
     background_tasks.add_task(service.parser(video_download.url).download, task_id, video_download)
@@ -100,14 +101,15 @@ async def start_download(request: Request, video_download: SVideoDownload, backg
 @check_task_id
 async def get_download_status(task_id: Annotated[str, Path()]) -> SVideoStatus:
     """Проверяет статус загрузки"""
-    return DOWNLOAD_TASKS[task_id].video_status
+    task = await redis_cache.get_download_task(task_id)
+    return task.video_status
 
 
 @router.get("/get-video/{task_id}")
 @check_task_id
 async def get_downloaded_video(task_id: Annotated[str, Path()]):
     """Отдает файл, если он скачан"""
-    task: DownloadTask = DOWNLOAD_TASKS[task_id]
+    task: DownloadTask = await redis_cache.get_download_task(task_id)
     if isinstance(task.filepath, str):
         task.filepath = PathLib(task.filepath)
 

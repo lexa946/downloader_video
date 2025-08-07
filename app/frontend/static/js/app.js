@@ -391,7 +391,7 @@ async function startDownload(videoFormatId, audioFormatId) {
         
         const statusData = await response.json();
         currentTaskId = statusData.task_id;
-        
+        await loadUserHistory();
         showProgress();
         hideResults();
         startProgressTracking();
@@ -431,20 +431,18 @@ async function checkDownloadProgress() {
             clearInterval(progressInterval);
             progressInterval = null;
             console.log('Video completed download.');
-                    // Показываем кнопку для повторного скачивания
             if (downloadReadyContainer) {
                 downloadReadyContainer.style.display = 'block';
             }
+            await loadUserHistory();
             hideProgress();
-        } else if (statusData.status === 'Error') {
+        } else if (statusData.status === 'error') {
             clearInterval(progressInterval);
             progressInterval = null;
             showError(statusData.description || 'Произошла ошибка при скачивании');
             hideProgress();
             showResults();
         }
-        refreshHistoryOnComplete();
-        
     } catch (error) {
         console.error('Error checking progress:', error);
         clearInterval(progressInterval);
@@ -637,7 +635,6 @@ async function loadUserHistory() {
         
         if (historyData.history && historyData.history.length > 0) {
             const history = historyData.history;
-            history.reverse();
             displayHistory(history);
             if (historySection) {
                 historySection.style.display = 'block';
@@ -711,7 +708,8 @@ function createHistoryElement(videoStatus) {
             handleAnalyzeVideo();
             
             // Скроллим к началу страницы
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            resultsSection.scrollIntoView()
+            // window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     });
     

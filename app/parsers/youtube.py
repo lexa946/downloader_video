@@ -24,20 +24,21 @@ class YouTubeParser(BaseParser):
 
         download_path = Path(settings.DOWNLOAD_FOLDER) / self._yt.author
 
+        event_loop = asyncio.get_event_loop()
+
         def post_process_hook(stream_: Stream, chunk: bytes, bytes_remaining: int):
             bytes_received = stream_.filesize - bytes_remaining
             percent = round(100.0 * bytes_received / float(stream_.filesize), 1)
             task.video_status.percent = float(percent)
-            asyncio.create_task(redis_cache.set_download_task(task_id, task))
+            event_loop.create_task(redis_cache.set_download_task(task_id, task))
 
 
 
         self._yt.register_on_progress_callback(post_process_hook)
         try:
-            # Если video_format_id пустой, скачиваем только аудио
             if not download_video.video_format_id:
                 task.video_status.description = "Downloading audio track"
-                asyncio.create_task(redis_cache.set_download_task(task_id, task))
+                await redis_cache.set_download_task(task_id, task)
                 audio_path = Path(await asyncio.to_thread(
                     self._yt.streams.get_by_itag(download_video.audio_format_id).download,
                     output_path=download_path.as_posix(),

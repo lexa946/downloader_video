@@ -395,12 +395,7 @@ async function startDownload(videoFormatId, audioFormatId) {
         showProgress();
         hideResults();
         startProgressTracking();
-        
-        // Refresh history after starting download
-        setTimeout(() => {
-            loadUserHistory();
-        }, 1000);
-        
+
         showSuccess('Скачивание началось!');
         
     } catch (error) {
@@ -432,7 +427,7 @@ async function checkDownloadProgress() {
         
         updateProgressDisplay(statusData);
 
-        if (statusData.status === 'Completed') {
+        if (statusData.status === 'completed') {
             clearInterval(progressInterval);
             progressInterval = null;
             console.log('Video completed download.');

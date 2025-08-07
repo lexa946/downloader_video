@@ -5,8 +5,9 @@ from pathlib import Path
 from pytubefix import Stream, YouTube, StreamQuery
 
 from app.config import settings
+from app.models.cache import redis_cache
 from app.models.status import VideoDownloadStatus
-from app.models.storage import DOWNLOAD_TASKS, DownloadTask
+from app.models.types import DownloadTask
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoFormat, SVideoResponse, SVideoDownload
 from app.utils.video_utils import save_preview_on_s3, combine_audio_and_video, convert_to_mp3
@@ -19,7 +20,7 @@ class YouTubeParser(BaseParser):
         self._yt = YouTube(self.url)
 
     async def download(self, task_id: str, download_video: SVideoDownload):
-        task: DownloadTask = DOWNLOAD_TASKS[task_id]
+        task: DownloadTask = await redis_cache.get_download_task(task_id)
 
         download_path = Path(settings.DOWNLOAD_FOLDER) / self._yt.author
 
@@ -27,12 +28,16 @@ class YouTubeParser(BaseParser):
             bytes_received = stream_.filesize - bytes_remaining
             percent = round(100.0 * bytes_received / float(stream_.filesize), 1)
             task.video_status.percent = float(percent)
+            asyncio.create_task(redis_cache.set_download_task(task_id, task))
+
+
 
         self._yt.register_on_progress_callback(post_process_hook)
         try:
             # Если video_format_id пустой, скачиваем только аудио
             if not download_video.video_format_id:
                 task.video_status.description = "Downloading audio track"
+                asyncio.create_task(redis_cache.set_download_task(task_id, task))
                 audio_path = Path(await asyncio.to_thread(
                     self._yt.streams.get_by_itag(download_video.audio_format_id).download,
                     output_path=download_path.as_posix(),
@@ -41,6 +46,7 @@ class YouTubeParser(BaseParser):
                 
                 # Конвертируем в MP3
                 task.video_status.description = "Converting to MP3"
+                await redis_cache.set_download_task(task_id, task)
                 out_path = audio_path.with_suffix('.mp3')
                 await asyncio.to_thread(convert_to_mp3,
                                     audio_path.as_posix(),
@@ -52,6 +58,7 @@ class YouTubeParser(BaseParser):
             else:
                 # Стандартная логика для видео
                 task.video_status.description = "Downloading video track"
+                await redis_cache.set_download_task(task_id, task)
                 video_path = Path(await asyncio.to_thread(
                     self._yt.streams.get_by_itag(download_video.video_format_id).download,
                     output_path=download_path.as_posix(),
@@ -59,12 +66,14 @@ class YouTubeParser(BaseParser):
                 ))
                 if download_video.audio_format_id != download_video.video_format_id:
                     task.video_status.description = "Downloading audio track"
+                    await redis_cache.set_download_task(task_id, task)
                     audio_path = Path(await asyncio.to_thread(
                         self._yt.streams.get_by_itag(download_video.audio_format_id).download,
                         output_path=download_path.as_posix(),
                         filename_prefix=f"{task_id}_audio_"
                     ))
                     task.video_status.description = "Merging tracks"
+                    await redis_cache.set_download_task(task_id, task)
                     out_path = video_path.with_name(video_path.stem + "_out.mp4")
                     await asyncio.to_thread(combine_audio_and_video,
                                             video_path.as_posix(),
@@ -78,10 +87,12 @@ class YouTubeParser(BaseParser):
 
             task.video_status.status = VideoDownloadStatus.COMPLETED
             task.video_status.description = VideoDownloadStatus.COMPLETED
+            await redis_cache.set_download_task(task_id, task)
 
         except Exception as e:
             task.video_status.status = VideoDownloadStatus.ERROR
             task.video_status.description = str(e)
+            await redis_cache.set_download_task(task_id, task)
 
 
     @staticmethod

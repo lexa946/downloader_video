@@ -8,6 +8,7 @@ from app.routers.front import router as new_front_router
 
 
 
+
 app = FastAPI()
 
 app.include_router(service_router)

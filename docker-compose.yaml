@@ -1,4 +1,12 @@
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 60 1 --loglevel warning
+
   downloader_video:
     restart: unless-stopped
     build:
@@ -9,3 +17,8 @@ services:
       - "8084:80"
     volumes:
       - ./.env:/.env:ro
+    depends_on:
+      - redis
+
+volumes:
+  redis_data:

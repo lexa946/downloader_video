@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     INSTAGRAM_CSRFTOKEN: str
     INSTAGRAM_SESSIONID: str
 
+    # Redis settings
+    REDIS_HOST: str
+    REDIS_PORT: int
+    REDIS_DB: int
+    REDIS_PREFIX: str 
+    REDIS_TTL: int
+
     @model_validator(mode="before")
     def set_more_field(cls, values):
         os.makedirs(values['DOWNLOAD_FOLDER'], exist_ok=True)

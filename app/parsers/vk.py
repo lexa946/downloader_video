@@ -1,4 +1,5 @@
 import asyncio
+import json
 import re
 import ssl
 import aiofiles
@@ -32,6 +33,8 @@ class VkVideo:
             # Разные возможные структуры ответа от VK API
             if 'payload' in json_ and len(json_['payload']) > 1:
                 video_info = json_['payload'][1][4]['player']['params'][0]
+            if "params" in json_:
+                video_info = json_['params'][0]
             else:
                 # Альтернативная структура
                 video_info = json_
@@ -65,7 +68,7 @@ class VkParser(BaseParser):
     def __init__(self, url):
 
         self.url = url
-        self.owner_id, self.video_id = re.search(r"video-(\d+_\d+)", self.url).group(1).split("_")
+        self.owner_id, self.video_id = re.search(r"video-?(\d+_\d+)", self.url).group(1).split("_")
         self.access_token = None
         self.bytes_read = 0
         self.total_size = 0
@@ -121,20 +124,28 @@ class VkParser(BaseParser):
                 part.parent.rmdir()
 
     async def _get_video_info(self, session: aiohttp.ClientSession) -> dict:
-        data = {
-            "al": 1,
-            "is_video_page": True,
-            "video": f"-{self.owner_id}_{self.video_id}",
-        }
         try:
-            async with session.post(self.VIDEO_INFO_URL, data=data, ssl=self._ssl_context) as response:
-                response.raise_for_status()
-                response_json = await response.json()
-            return response_json
+            if "vkvideo" in self.url:
+                data = {
+                    "al": 1,
+                    "is_video_page": True,
+                    "video": f"-{self.owner_id}_{self.video_id}",
+                }
+                async with session.post(self.VIDEO_INFO_URL, data=data, ssl=self._ssl_context) as response:
+                    response.raise_for_status()
+                    response_json = await response.json()
+                return response_json
+            else:
+                embed_url = f"https://vk.com/video_ext.php?oid={self.owner_id}&id={self.video_id}"
+                async with session.get(embed_url,  ssl=self._ssl_context) as response:
+                    response.raise_for_status()
+                    html = await response.text()
+                    json_str = re.search(r'var\s+playerParams\s*=\s*(\{[\s\S]*?\});', html).group(1)
+                    response_json = json.loads(json_str)
+                    return response_json
         except Exception as e:
             print(f"VK Parser Error: {e}")
             print(f"URL: {self.url}")
-            print(f"Data: {data}")
             raise
 
     async def download(self, task_id: str, download_video: SVideoDownload):
@@ -157,7 +168,10 @@ class VkParser(BaseParser):
             task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
             await redis_cache.set_download_task(task_id, task)
 
-            content_url = video.content_urls[download_video.audio_format_id]
+            if is_audio_only:
+                content_url = video.content_urls[download_video.audio_format_id]
+            else:
+                content_url = video.content_urls[download_video.video_format_id]
 
             async with session.get(content_url, ssl=self._ssl_context) as response:
                 response.raise_for_status()

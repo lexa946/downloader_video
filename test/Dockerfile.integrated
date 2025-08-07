@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Устанавливаем зависимости
+RUN pip install aiohttp aiofiles
+
+# Копируем упрощенный тестовый скрипт
+COPY test_integrated_parser_simple.py .
+
+# Создаем директорию для выходных файлов
+RUN mkdir -p output
+
+CMD ["python", "test_integrated_parser_simple.py"] 

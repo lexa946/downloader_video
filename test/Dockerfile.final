@@ -1,0 +1,13 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Устанавливаем зависимости
+RUN pip install aiohttp aiofiles
+
+COPY final_vk_parser.py .
+
+# Создаем директорию для выходных файлов
+RUN mkdir -p output
+
+CMD ["python", "final_vk_parser.py", "https://vk.com/video335482664_456239334"] 

@@ -1,0 +1,7 @@
+services:
+  vk_parser_integrated:
+    build:
+      context: .
+      dockerfile: Dockerfile.integrated
+    volumes:
+      - ./output:/app/output 

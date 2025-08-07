@@ -1,0 +1,7 @@
+services:
+  vk_parser_final:
+    build:
+      context: .
+      dockerfile: Dockerfile.final
+    volumes:
+      - ./output:/app/output 

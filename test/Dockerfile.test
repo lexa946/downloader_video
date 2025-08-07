@@ -1,0 +1,10 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Устанавливаем только необходимые зависимости для тестирования
+RUN pip install aiohttp aiofiles
+
+COPY test_vk_parser.py .
+
+CMD ["python", "test_vk_parser.py"]

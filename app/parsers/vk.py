@@ -60,26 +60,119 @@ class VkVideo:
 class VkParser(BaseParser):
     CONNECTIONS_COUNT = 10
     CHUNK_SIZE = 1024 * 64
-    VIDEO_INFO_URL = "https://vkvideo.ru/al_video.php?act=show"
+    VKVIDEO_INFO_URL = "https://vkvideo.ru/al_video.php?act=show"
 
     def __init__(self, url):
-
         self.url = url
-        self.owner_id, self.video_id = re.search(r"video-(\d+_\d+)", self.url).group(1).split("_")
+        self.is_vk_com = "vk.com" in url
+        self.is_vkvideo_ru = "vkvideo.ru" in url
+        
+        if self.is_vk_com:
+            # Для vk.com: video335482664_456239334
+            match = re.search(r"video(\d+_\d+)", url)
+            if not match:
+                raise ValueError("Неверный формат URL VK видео")
+            self.owner_id, self.video_id = match.group(1).split("_")
+        elif self.is_vkvideo_ru:
+            # Для vkvideo.ru: video-212496568_456248024
+            match = re.search(r"video-(\d+_\d+)", url)
+            if not match:
+                raise ValueError("Неверный формат URL VKVideo")
+            self.owner_id, self.video_id = match.group(1).split("_")
+        else:
+            raise ValueError("Неподдерживаемый URL. Поддерживаются только vk.com и vkvideo.ru")
+        
         self.access_token = None
         self.bytes_read = 0
         self.total_size = 0
+        self.video_hash = None
+        self.video_title = None
 
         self._headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 YaBrowser/25.6.0.0 Safari/537.36",
-            "X-Requested-With": "XMLHttpRequest",
-            "Referer": f"https://vkvideo.ru/video-{self.owner_id}_{self.video_id}",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1"
         }
+        
+        if self.is_vkvideo_ru:
+            self._headers.update({
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": f"https://vkvideo.ru/video-{self.owner_id}_{self.video_id}",
+            })
+        
         self._lock = asyncio.Lock()
 
         self._ssl_context = ssl.create_default_context()
         self._ssl_context.check_hostname = False
         self._ssl_context.verify_mode = ssl.CERT_NONE
+
+    def _extract_video_hash(self, html: str) -> str:
+        """Извлекает hash видео из HTML страницы"""
+        hash_match = re.search(r'og:video" content="[^"]*hash=([^&"]+)', html)
+        if hash_match:
+            return hash_match.group(1)
+        return None
+
+    def _extract_video_title(self, html: str) -> str:
+        """Извлекает название видео из HTML страницы"""
+        title_match = re.search(r'og:title" content="([^"]+)"', html)
+        if title_match:
+            title = title_match.group(1)
+            # Очищаем название от недопустимых символов для имени файла
+            return self._sanitize_filename(title)
+        return None
+
+    def _sanitize_filename(self, filename: str) -> str:
+        """Очищает название файла от недопустимых символов"""
+        # Удаляем или заменяем недопустимые символы
+        filename = re.sub(r'[<>:"/\\|?*]', '', filename)
+        # Заменяем множественные пробелы на один
+        filename = re.sub(r'\s+', ' ', filename)
+        # Убираем пробелы в начале и конце
+        filename = filename.strip()
+        # Ограничиваем длину
+        if len(filename) > 100:
+            filename = filename[:100]
+        return filename
+
+    def _extract_video_urls(self, html: str) -> dict:
+        """Извлекает URL видео из embed страницы"""
+        video_urls = {}
+        
+        # HLS URL
+        hls_match = re.search(r'"hls":"([^"]+)"', html)
+        if hls_match:
+            video_urls['hls'] = hls_match.group(1).replace('\\/', '/')
+        
+        # DASH URL
+        dash_match = re.search(r'"dash_sep":"([^"]+)"', html)
+        if dash_match:
+            video_urls['dash'] = dash_match.group(1).replace('\\/', '/')
+        
+        # Прямые URL для разных качеств
+        for quality in ['144', '240', '360', '480']:
+            url_match = re.search(f'"url{quality}":"([^"]+)"', html)
+            if url_match:
+                video_urls[f'url{quality}'] = url_match.group(1).replace('\\/', '/')
+        
+        return video_urls
+
+    def _select_best_quality(self, video_urls: dict) -> tuple:
+        """Выбирает лучшее доступное качество"""
+        preferred_qualities = ['url480', 'url360', 'url240', 'url144', 'hls', 'dash']
+        
+        for quality in preferred_qualities:
+            if quality in video_urls:
+                return video_urls[quality], quality
+        
+        return None, None
 
     async def _fetch_range(self,
                            session: aiohttp.ClientSession,
@@ -120,28 +213,122 @@ class VkParser(BaseParser):
             else:
                 part.parent.rmdir()
 
-    async def _get_video_info(self, session: aiohttp.ClientSession) -> dict:
+    async def _get_vkvideo_info(self, session: aiohttp.ClientSession) -> dict:
+        """Получает информацию о видео с vkvideo.ru"""
         data = {
             "al": 1,
             "is_video_page": True,
             "video": f"-{self.owner_id}_{self.video_id}",
         }
         try:
-            async with session.post(self.VIDEO_INFO_URL, data=data, ssl=self._ssl_context) as response:
+            async with session.post(self.VKVIDEO_INFO_URL, data=data, ssl=self._ssl_context) as response:
                 response.raise_for_status()
                 response_json = await response.json()
             return response_json
         except Exception as e:
-            print(f"VK Parser Error: {e}")
+            print(f"VKVideo Parser Error: {e}")
             print(f"URL: {self.url}")
             print(f"Data: {data}")
             raise
+
+    async def _get_vk_com_info(self, session: aiohttp.ClientSession) -> dict:
+        """Получает информацию о видео с vk.com"""
+        try:
+            # 1. Получаем страницу видео для извлечения hash и названия
+            print(f"1. Получаем страницу видео: {self.url}")
+            async with session.get(self.url, ssl=self._ssl_context) as response:
+                html = await response.text()
+            
+            # 2. Извлекаем hash и название
+            self.video_hash = self._extract_video_hash(html)
+            self.video_title = self._extract_video_title(html)
+            
+            if self.video_hash:
+                print(f"2. Найден hash: {self.video_hash}")
+            else:
+                print("2. Hash не найден, пробуем без hash")
+            
+            if self.video_title:
+                print(f"3. Название видео: {self.video_title}")
+            else:
+                print("3. Название видео не найдено")
+                self.video_title = f"video_{self.owner_id}_{self.video_id}"
+            
+            # 3. Получаем embed страницу
+            if self.video_hash:
+                embed_url = f"https://vk.com/video_ext.php?oid={self.owner_id}&id={self.video_id}&hash={self.video_hash}"
+            else:
+                embed_url = f"https://vk.com/video_ext.php?oid={self.owner_id}&id={self.video_id}"
+            
+            print(f"4. Получаем embed страницу: {embed_url}")
+            
+            embed_headers = self._headers.copy()
+            embed_headers.update({
+                "Referer": self.url,
+                "Origin": "https://vk.com"
+            })
+            
+            async with session.get(embed_url, headers=embed_headers, ssl=self._ssl_context) as response:
+                embed_html = await response.text()
+                print(f"5. Embed ответ получен, размер: {len(embed_html)} байт")
+            
+            # 4. Извлекаем URL видео
+            video_urls = self._extract_video_urls(embed_html)
+            print(f"6. Найдено URL видео: {list(video_urls.keys())}")
+            
+            if not video_urls:
+                raise Exception("URL видео не найдены")
+            
+            # 5. Выбираем лучшее качество
+            download_url, quality_name = self._select_best_quality(video_urls)
+            if not download_url:
+                raise Exception("Подходящий URL видео не найден")
+            
+            # Формируем структуру, совместимую с VkVideo
+            quality_suffix = quality_name.replace('url', '') if quality_name.startswith('url') else quality_name
+            
+            return {
+                'title': self.video_title,
+                'author': 'VK User',
+                'content_urls': {quality_suffix: download_url},
+                'preview_url': '',
+                'duration': 0,
+                'size': 0
+            }
+            
+        except Exception as e:
+            print(f"VK.com Parser Error: {e}")
+            print(f"URL: {self.url}")
+            raise
+
+    async def _get_video_info(self, session: aiohttp.ClientSession) -> dict:
+        """Получает информацию о видео в зависимости от типа URL"""
+        if self.is_vkvideo_ru:
+            return await self._get_vkvideo_info(session)
+        elif self.is_vk_com:
+            return await self._get_vk_com_info(session)
+        else:
+            raise ValueError("Неподдерживаемый тип URL")
 
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
         async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context)) as session:
             response_json = await self._get_video_info(session)
-            video = VkVideo.from_json(response_json)
+            
+            # Создаем объект VkVideo из полученных данных
+            if self.is_vk_com:
+                # Для vk.com используем прямую структуру
+                video = VkVideo(
+                    title=response_json['title'],
+                    author=response_json['author'],
+                    content_urls=response_json['content_urls'],
+                    preview_url=response_json['preview_url'],
+                    duration=response_json['duration'],
+                    size=response_json['size']
+                )
+            else:
+                # Для vkvideo.ru используем существующий парсер
+                video = VkVideo.from_json(response_json)
 
             is_audio_only = not download_video.video_format_id
             extension = '.mp3' if is_audio_only else '.mp4'
@@ -201,13 +388,28 @@ class VkParser(BaseParser):
         try:
             print(f"VK Parser: Starting get_formats for URL: {self.url}")
             print(f"VK Parser: owner_id={self.owner_id}, video_id={self.video_id}")
+            print(f"VK Parser: is_vk_com={self.is_vk_com}, is_vkvideo_ru={self.is_vkvideo_ru}")
             
             async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context)) as session:
                 response_json = await self._get_video_info(session)
                 
             print(f"VK Parser: Got response JSON keys: {list(response_json.keys()) if isinstance(response_json, dict) else 'Not a dict'}")
             
-            video = VkVideo.from_json(response_json)
+            # Создаем объект VkVideo из полученных данных
+            if self.is_vk_com:
+                # Для vk.com используем прямую структуру
+                video = VkVideo(
+                    title=response_json['title'],
+                    author=response_json['author'],
+                    content_urls=response_json['content_urls'],
+                    preview_url=response_json['preview_url'],
+                    duration=response_json['duration'],
+                    size=response_json['size']
+                )
+            else:
+                # Для vkvideo.ru используем существующий парсер
+                video = VkVideo.from_json(response_json)
+            
             print(f"VK Parser: Parsed video - title: {video.title}, available qualities: {list(video.content_urls.keys())}")
 
             if not video.content_urls:

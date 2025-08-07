@@ -107,3 +107,23 @@ async def yandex_verification():
     yandex_file = FRONTEND_DIR / "seo" / "yandex_c51849ff7e8fe28a.html"
     return FileResponse(yandex_file, media_type="text/html")
 
+
+@router.get("/blog", response_class=HTMLResponse)
+async def blog_index(request: Request):
+    """Главная страница блога"""
+    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
+    response = templates.TemplateResponse("blog/index.html", context={"request": request, "user_id": user_id})
+    if "user_id" not in request.cookies:
+        response.set_cookie("user_id", user_id)
+    return response
+
+
+@router.get("/blog/kak-skachat-video-s-youtube-bez-programm", response_class=HTMLResponse)
+async def blog_article_youtube(request: Request):
+    """Статья о скачивании видео с YouTube"""
+    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
+    response = templates.TemplateResponse("blog/kak-skachat-video-s-youtube-bez-programm.html", context={"request": request, "user_id": user_id})
+    if "user_id" not in request.cookies:
+        response.set_cookie("user_id", user_id)
+    return response
+

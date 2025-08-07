@@ -30,7 +30,7 @@ from app.schemas.main import SVideoResponse
     ]
 )
 def test_get_all_formats(client, url:str, title: str, author: str, count_formats: int, preview_url: str, duration: str):
-    response = client.get("/api/get-formats", params={"url": url})
+    response = client.post("/api/get-formats", json={"url": url})
     assert response.status_code == 200
 
     format_response = SVideoResponse.model_validate(response.json())

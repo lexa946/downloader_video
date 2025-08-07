@@ -426,7 +426,7 @@ async function checkDownloadProgress() {
         const statusData = await response.json();
         
         updateProgressDisplay(statusData);
-
+        console.log(statusData.status)
         if (statusData.status === 'completed') {
             clearInterval(progressInterval);
             progressInterval = null;
@@ -636,7 +636,6 @@ async function loadUserHistory() {
         const historyData = await response.json();
         
         if (historyData.history && historyData.history.length > 0) {
-            console.log("here 1");
             const history = historyData.history;
             history.reverse();
             displayHistory(history);
@@ -645,7 +644,6 @@ async function loadUserHistory() {
                 historySection.classList.add('fade-in');
             }
         } else {
-            console.log("here 2");
             historySection.style.display = 'block';
             historySection.classList.add('fade-in');
             historyEmpty.style.display = 'block';

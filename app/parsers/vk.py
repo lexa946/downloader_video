@@ -33,7 +33,7 @@ class VkVideo:
             # Разные возможные структуры ответа от VK API
             if 'payload' in json_ and len(json_['payload']) > 1:
                 video_info = json_['payload'][1][4]['player']['params'][0]
-            if "params" in json_:
+            elif "params" in json_:
                 video_info = json_['params'][0]
             else:
                 # Альтернативная структура

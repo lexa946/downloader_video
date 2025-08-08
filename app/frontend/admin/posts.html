@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block content %}
-<main class="main">
+<div class="main">
   <div class="container">
     <div class="admin-toolbar">
       <h1 class="admin-title">Посты</h1>
@@ -42,7 +42,7 @@
               <span class="status-pill status-archived">archived</span>
             {% endif %}
           </td>
-          <td class="actions" style="text-align: right;">
+          <td class="actions">
             <a class="icon-btn" href="/admin/posts/{{ p.id }}/edit" title="Редактировать" aria-label="Редактировать">
               <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42L18.37 3.29a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z"/></svg>
             </a>
@@ -57,7 +57,7 @@
                   <p>Пост станет черновиком.</p>
                   <div class="modal-actions">
                     <button type="button" class="btn secondary" onclick="closeModal('unpub-{{ p.id }}')">Отмена</button>
-                    <button type="submit" class="btn warning" onclick="this.closest('form').submit()">Подтвердить</button>
+                    <button type="submit" class="btn primary" onclick="this.closest('form').submit()">Подтвердить</button>
                   </div>
                 </div>
               </div>
@@ -99,7 +99,7 @@
       </tbody>
     </table>
   </div>
-</main>
+</div>
 {% endblock %}
 
 

@@ -5,18 +5,28 @@
 {% block content %}
 <main class="main">
   <div class="container">
-    <h1>Блог</h1>
-    <div class="blog-list">
-      {% for p in posts %}
-        <article class="blog-card" style="margin-bottom: 24px;">
-          <h2 style="margin: 0 0 8px 0;"><a href="/blog/posts/{{ p.slug }}">{{ p.title }}</a></h2>
-          {% if p.excerpt %}<p style="margin: 0 0 8px 0; color:#666;">{{ p.excerpt }}</p>{% endif %}
-          <div style="font-size: 14px; color: #999;">{{ p.published_at or p.created_at }}</div>
-        </article>
-      {% else %}
-        <p>Постов пока нет.</p>
-      {% endfor %}
-    </div>
+    <section class="blog-content">
+      <div class="blog-grid">
+        {% for p in posts %}
+          <article class="blog-post">
+            <div class="blog-post-meta">
+              <time datetime="{{ p.published_at or p.created_at }}">{{ p.published_at or p.created_at }}</time>
+            </div>
+            <h2 class="blog-post-title">
+              <a href="/blog/posts/{{ p.slug }}">{{ p.title }}</a>
+            </h2>
+            {% if p.excerpt %}
+            <p class="blog-post-excerpt">{{ p.excerpt }}</p>
+            {% endif %}
+            <div class="blog-post-footer">
+              <a href="/blog/posts/{{ p.slug }}" class="read-more-btn">Читать далее</a>
+            </div>
+          </article>
+        {% else %}
+          <p>Постов пока нет.</p>
+        {% endfor %}
+      </div>
+    </section>
   </div>
 </main>
 {% endblock %}

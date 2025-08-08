@@ -24,7 +24,7 @@
 .table { width: 100%; border-collapse: collapse; }
 .table th, .table td { padding: 12px 14px; border-bottom: 1px solid #e9ecef; text-align: left; vertical-align: top; }
 .table th { background: #f8f9fa; color: #495057; font-weight: 600; position: sticky; top: 0; }
-.table td.actions { text-align: right; }
+.table td.actions { text-align: right; white-space: nowrap; width: 1%; }
 
 .status-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; }
 .status-draft { background: #fff3cd; color: #856404; }
@@ -73,4 +73,23 @@
 .hidden-file { display: none !important; }
 
 @media (max-width: 992px) { .form-grid { grid-template-columns: 1fr; } }
+
+/* Modals */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 1000; }
+.modal { background: #fff; border-radius: 12px; padding: 20px; width: 420px; max-width: 92vw; box-shadow: 0 10px 30px rgba(0,0,0,0.2); border: 1px solid #e9ecef; }
+.modal h3 { margin-top: 0; margin-bottom: 10px; font-size: 1.2rem; }
+.modal .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.modal .btn { padding: 8px 12px; border-radius: 10px; border: 1px solid #dee2e6; background: #f8f9fa; cursor: pointer; }
+.modal .btn.primary { background: #3498db; color: #fff; border-color: #3498db; }
+.modal .btn.danger { background: #e74c3c; color: #fff; border-color: #e74c3c; }
+.modal .btn.secondary { background: #adb5bd; color: #fff; border-color: #adb5bd; }
+.modal-overlay.active { display: flex; }
+
+/* Icon buttons in actions */
+.icon-btn { background: transparent; border: none; padding: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.icon-btn svg { width: 20px; height: 20px; fill: #3498db; }
+.icon-btn:hover svg { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.15)); }
+.icon-btn.success svg { fill: #27ae60; }
+.icon-btn.warning svg { fill: #f1c40f; }
+.icon-btn.danger svg { fill: #e74c3c; }
 

@@ -8,5 +8,5 @@ test.*
 cookie*
 .cursorrules
 .cursor/rules/*
-./pg_data
-./redis_data
+./pg_data/*
+./redis_data/*

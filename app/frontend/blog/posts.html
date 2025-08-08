@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block title %}Блог — Посты{% endblock %}
+
+{% block content %}
+<main class="main">
+  <div class="container">
+    <h1>Блог</h1>
+    <div class="blog-list">
+      {% for p in posts %}
+        <article class="blog-card" style="margin-bottom: 24px;">
+          <h2 style="margin: 0 0 8px 0;"><a href="/blog/posts/{{ p.slug }}">{{ p.title }}</a></h2>
+          {% if p.excerpt %}<p style="margin: 0 0 8px 0; color:#666;">{{ p.excerpt }}</p>{% endif %}
+          <div style="font-size: 14px; color: #999;">{{ p.published_at or p.created_at }}</div>
+        </article>
+      {% else %}
+        <p>Постов пока нет.</p>
+      {% endfor %}
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+

@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     REDIS_PREFIX: str 
     REDIS_TTL: int
 
+    # Database / Admin / Security
+    DATABASE_URL: str | None = None  # e.g. postgresql+asyncpg://user:pass@host:5432/db
+    SECRET_KEY: str = "insecure-dev-secret"  # override in production
+    ADMIN_EMAIL: str | None = None
+    ADMIN_USERNAME: str | None = None
+    ADMIN_PASSWORD: str | None = None
+
     @model_validator(mode="before")
     def set_more_field(cls, values):
         os.makedirs(values['DOWNLOAD_FOLDER'], exist_ok=True)

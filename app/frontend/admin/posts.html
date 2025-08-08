@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}Админка — Посты{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="/static/css/admin.css">
+{% endblock %}
+
+{% block content %}
+<main class="main">
+  <div class="container">
+    <div class="admin-toolbar">
+      <h1 class="admin-title">Посты</h1>
+      <a class="cta-button" href="/admin/posts/new">Новый пост</a>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Заголовок</th>
+          <th>Слаг</th>
+          <th>Статус</th>
+          <th>Опубликован</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in posts %}
+        <tr>
+          <td>{{ p.id }}</td>
+          <td>{{ p.title }}</td>
+          <td>{{ p.slug }}</td>
+          <td>{{ p.status }}</td>
+          <td>{{ p.published_at or '' }}</td>
+          <td class="actions">
+            <a href="/admin/posts/{{ p.id }}/edit">Редактировать</a>
+            <form method="post" action="/admin/posts/{{ p.id }}/delete" style="display:inline; margin-left: 8px;" onsubmit="return confirm('Удалить пост?');">
+              <button type="submit" style="background:none; border:none; color:#b00020; cursor:pointer;">Удалить</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</main>
+{% endblock %}
+
+

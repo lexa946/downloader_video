@@ -1,0 +1,76 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Блог — Посты{% endblock %}
+
+{% block head %}
+    <meta name="description" content="Полезные статьи о скачивании видео с YouTube, Instagram*, VK. Советы, инструкции и обзоры сервисов для загрузки видео.">
+    <meta name="keywords" content="блог скачивание видео, статьи youtube, Instagram* vk скачивание, полезные советы видео">
+
+    <meta name="author" content="Video Downloader">
+
+    <!-- Open Graph meta tags -->
+    <meta property="og:title" content="Блог - Полезные статьи о скачивании видео">
+    <meta property="og:description" content="Полезные статьи о скачивании видео с YouTube, Instagram*, VK. Советы и инструкции.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://downloader.pozharsite.ru/blog">
+    <meta property="og:image" content="https://downloader.pozharsite.ru/static/images/favicon.png">
+
+    <!-- Twitter Card meta tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Блог - Полезные статьи о скачивании видео">
+    <meta name="twitter:description" content="Полезные статьи о скачивании видео с YouTube, Instagram*, VK">
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://downloader.pozharsite.ru/blog">
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "http://schema.org",
+      "@type": "Blog",
+      "name": "Блог Video Downloader",
+      "url": "https://downloader.pozharsite.ru/blog",
+      "description": "Полезные статьи о скачивании видео с популярных платформ",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Video Downloader"
+      }
+    }
+    </script>
+{% endblock %}
+
+{% block content %}
+<main class="main">
+  <div class="container">
+    <section class="blog-content">
+      <div class="blog-grid">
+        {% for p in posts %}
+          <article class="blog-post">
+            <div class="blog-post-meta">
+              <time datetime="{{ p.published_at or p.created_at }}">{{ (p.published_at or p.created_at)|ru_date }}</time>
+              {% if p.tags %}
+                {% for tag in p.tags %}
+                  <span class="blog-category">{{ tag }}</span>
+                {% endfor %}
+              {% endif %}
+            </div>
+            <h2 class="blog-post-title">
+              <a href="/blog/{{ p.slug }}">{{ p.title }}</a>
+            </h2>
+            {% if p.excerpt %}
+            <p class="blog-post-excerpt">{{ p.excerpt }}</p>
+            {% endif %}
+            <div class="blog-post-footer">
+              <a href="/blog/{{ p.slug }}" class="read-more-btn">Читать далее</a>
+            </div>
+          </article>
+        {% else %}
+          <p>Постов пока нет.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+</main>
+{% endblock %}
+
+

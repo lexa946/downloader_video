@@ -188,7 +188,7 @@ function validateUrl(url) {
     );
     
     if (!isSupported) {
-        return 'Данная платформа не поддерживается. Поддерживаются: YouTube, Instagram, VK, VK Video';
+        return 'Данная платформа не поддерживается. Поддерживаются: YouTube, Instagram*, VK, VK Video';
     }
     
     return null;

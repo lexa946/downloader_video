@@ -1,0 +1,134 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Админка — {{ 'Редактировать' if is_edit else 'Новый пост' }}{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <!-- SunEditor (MIT) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/suneditor@latest/dist/css/suneditor.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/suneditor@latest/dist/suneditor.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/suneditor@latest/src/lang/ru.js"></script>
+    <script src="/static/js/admin_forms.js"></script>
+{% endblock %}
+
+{% block content %}
+    <main class="main">
+        <div class="container" style="max-width: 960px;">
+            <form class="form" method="post" enctype="multipart/form-data"
+                  action="{{ '/admin/posts/' ~ post.id if is_edit else '/admin/posts' }}">
+                <div class="tabs">
+                    <div class="wrapper-actions">
+                        <div class="wrapper-header-tab-nav">
+                            <h1>{{ 'Редактировать пост' if is_edit else 'Новый пост' }}</h1>
+                            <div class="tab-nav">
+                                <button data-tab="tab-meta" type="button" class="active">Мета</button>
+                                <button data-tab="tab-content" type="button">Контент</button>
+                            </div>
+                        </div>
+                        <div class="form-row actions">
+                            <button type="submit" class="cta-button">Сохранить</button>
+                            <a class="cta-button" style="background:#666;" href="/admin/posts">Отмена</a>
+                        </div>
+                    </div>
+                    <div id="tab-meta" class="tab-panel active">
+                        <div class="card form-grid">
+                            <div>
+                                <div class="form-row">
+                                    <label>Слаг</label>
+                                    <input type="text" name="slug" value="{{ post.slug if post else '' }}" required
+                                           readonly/>
+                                    <div class="form-note">Формируется автоматически из заголовка</div>
+                                </div>
+                                <div class="form-row">
+                                    <label>Заголовок</label>
+                                    <input type="text" name="title" value="{{ post.title if post else '' }}" required/>
+                                </div>
+                                <div class="form-row">
+                                    <label>Подзаголовок</label>
+                                    <input type="text" name="subtitle" value="{{ post.subtitle if post else '' }}"/>
+                                </div>
+                                <div class="form-row">
+                                    <label>Краткое описание</label>
+                                    <textarea name="excerpt" rows="3">{{ post.excerpt if post else '' }}</textarea>
+                                </div>
+                                <div class="form-row">
+                                    <label>Обложка (URL или загрузка файла)</label>
+                                    <div class="input-with-icon">
+                                        <input style="width:100%" type="text" name="cover_image_url"
+                                               placeholder="https://..."
+                                               value="{{ post.cover_image_url if post else '' }}"/>
+                                        <button class="input-action-btn" type="button"
+                                                onclick="document.getElementById('coverUpload').click()"
+                                                title="Загрузить изображение" aria-label="Загрузить изображение">
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" fill="none"
+                                                      stroke="#495057" stroke-width="2"/>
+                                                <path d="M7 10l5-5 5 5" fill="none" stroke="#495057" stroke-width="2"/>
+                                                <path d="M12 5v12" fill="none" stroke="#495057" stroke-width="2"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <input id="coverUpload" class="hidden-file" type="file" name="cover_image_file"
+                                           accept="image/*"/>
+                                    {% if post and post.cover_image_url %}
+                                        <div class="form-note">Текущая обложка:</div>
+                                        <img src="{{ post.cover_image_url }}" alt="cover preview"
+                                             style="max-width: 260px; border-radius: 8px; border: 1px solid #e9ecef;"/>
+                                    {% endif %}
+                                </div>
+                                <div class="form-row">
+                                    <label>Теги (через запятую)</label>
+                                    <input type="text" name="tags"
+                                           value="{{ post.tags|join(', ') if post and post.tags else '' }}"/>
+                                </div>
+                                <div class="form-row">
+                                    <label>Язык</label>
+                                    <input type="text" name="language" value="{{ post.language if post else 'ru' }}"/>
+                                </div>
+                                
+                            </div>
+                            <div>
+                                <div class="form-row">
+                                    <label>Canonical URL</label>
+                                    <input type="text" name="canonical_url"
+                                           value="{{ post.canonical_url if post else '' }}" readonly/>
+                                    <div class="form-note">Автоматически собирается из слага</div>
+                                </div>
+                                <div class="form-row">
+                                    <label>Meta title</label>
+                                    <input type="text" name="meta_title" value="{{ post.meta_title if post else '' }}"/>
+                                </div>
+                                <div class="form-row">
+                                    <label>Meta description</label>
+                                    <input type="text" name="meta_description"
+                                           value="{{ post.meta_description if post else '' }}"/>
+                                </div>
+                                <div class="form-row">
+                                    <label>OG Image</label>
+                                    <input type="text" name="og_image_url"
+                                           value="{{ post.og_image_url if post else '' }}"/>
+                                </div>
+                                <div class="form-row">
+                                    <label>Источник</label>
+                                    <input type="text" name="source_url" value="{{ post.source_url if post else '' }}"/>
+                                </div>
+                                {# Дата публикации теперь заполняется автоматически при публикации #}
+                            </div>
+                        </div>
+                    </div>
+                    <div id="tab-content" class="tab-panel">
+                        <div class="card" style="grid-column: 1 / -1;">
+                            <div class="form-row">
+                                <label>Контент</label>
+                                <textarea id="content" name="content"
+                                          rows="40">{{ post.content | safe if post else '' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </main>
+{% endblock %}
+
+

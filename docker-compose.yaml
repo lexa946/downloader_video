@@ -1,11 +1,23 @@
 services:
   redis:
+    restart: unless-stopped
     image: redis:7-alpine
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - ./redis_data:/data
     command: redis-server --save 60 1 --loglevel warning
+
+  postgres:
+    restart: unless-stopped
+    image: postgres:16
+    env_file:
+      - .env.postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pg_data:/var/lib/postgresql/data
+    container_name: downloader_postgres
 
   downloader_video:
     restart: unless-stopped
@@ -17,8 +29,7 @@ services:
       - "8084:80"
     volumes:
       - ./.env:/.env:ro
+      - ./app:/app:ro
     depends_on:
       - redis
-
-volumes:
-  redis_data:
+      - postgres

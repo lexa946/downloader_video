@@ -1,50 +1,43 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const dropdown = document.querySelector('.dropdown');
-    const dropdownToggle = document.querySelector('.dropdown-toggle');
-    const dropdownMenu = document.querySelector('.dropdown-menu');
-    
-    // Определяем текущую страницу
-    const currentPath = window.location.pathname;
-    const parserPages = [
-        '/youtube-downloader',
-        '/instagram-downloader', 
-        '/vk-downloader'
-    ];
-    
-    // Проверяем, находимся ли мы на странице парсера
-    const isOnParserPage = parserPages.includes(currentPath);
-    
-    // Если мы на странице парсера, подсвечиваем активную ссылку в dropdown
-    if (isOnParserPage) {
-        // Находим и подсвечиваем активную ссылку в dropdown
-        const activeLink = dropdownMenu.querySelector(`a[href="${currentPath}"]`);
-        if (activeLink) {
-            activeLink.classList.add('active');
-        }
+  const currentPath = window.location.pathname;
+
+  // Highlight active link inside any dropdown
+  document.querySelectorAll('.dropdown').forEach(dropdown => {
+    const menu = dropdown.querySelector('.dropdown-menu');
+    if (menu) {
+      const activeLink = menu.querySelector(`a[href="${currentPath}"]`);
+      if (activeLink) {
+        activeLink.classList.add('active');
+        const toggle = dropdown.querySelector('.dropdown-toggle');
+        if (toggle) toggle.classList.add('active');
+      }
     }
-    
-    // Обработчик клика по dropdown toggle
-    dropdownToggle.addEventListener('click', function(e) {
-        e.preventDefault();
-        dropdown.classList.toggle('active');
+  });
+
+  // Toggle behavior for multiple dropdowns
+  document.querySelectorAll('.dropdown-toggle').forEach(toggle => {
+    toggle.addEventListener('click', function(e) {
+      e.preventDefault();
+      const parent = this.closest('.dropdown');
+      if (!parent) return;
+      const isActive = parent.classList.contains('active');
+
+      // close others
+      document.querySelectorAll('.dropdown.active').forEach(d => {
+        if (d !== parent) d.classList.remove('active');
+      });
+
+      // toggle current
+      if (isActive) parent.classList.remove('active');
+      else parent.classList.add('active');
     });
-    
-    // Закрытие dropdown при клике вне его
-    document.addEventListener('click', function(e) {
-        if (!dropdown.contains(e.target)) {
-            dropdown.classList.remove('active');
-        }
-    });
-    
-    // Обработчик наведения мыши
-    dropdown.addEventListener('mouseenter', function() {
-        if (isOnParserPage) {
-            dropdown.classList.add('active');
-        }
-    });
-    
-    // Закрытие dropdown при выходе мыши за границы
-    dropdown.addEventListener('mouseleave', function() {
-        dropdown.classList.remove('active');
-    });
-}); 
+  });
+
+  // Close on outside click
+  document.addEventListener('click', function(e) {
+    const anyDropdown = e.target.closest('.dropdown');
+    if (!anyDropdown) {
+      document.querySelectorAll('.dropdown.active').forEach(d => d.classList.remove('active'));
+    }
+  });
+});

@@ -13,18 +13,13 @@ function setActiveNavigation() {
         }
     });
     
-    // Проверяем, находимся ли мы на странице парсера
-    const parserPages = [
-        '/youtube-downloader',
-        '/instagram-downloader', 
-        '/vk-downloader'
-    ];
-    
-    if (parserPages.includes(currentPath)) {
-        // Активируем dropdown toggle
-        const dropdownToggle = document.querySelector('.dropdown-toggle');
-        if (dropdownToggle) {
-            dropdownToggle.classList.add('active');
-        }
-    }
+    // Подсветка dropdown toggles по текущей странице
+    const dropdowns = document.querySelectorAll('.dropdown');
+    dropdowns.forEach(d => {
+        const menu = d.querySelector('.dropdown-menu');
+        const toggle = d.querySelector('.dropdown-toggle');
+        if (!menu || !toggle) return;
+        const link = menu.querySelector(`a[href="${currentPath}"]`);
+        if (link) toggle.classList.add('active');
+    });
 }

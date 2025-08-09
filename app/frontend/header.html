@@ -30,19 +30,40 @@
                         </li>
                     </ul>
                 </li>
-                <li class="nav-item">
-                    <a href="/faq" class="nav-link">FAQ</a>
-                </li>
-                <li class="nav-item">
-                    <a href="/privacy" class="nav-link">Конфиденциальность</a>
-                </li>
-                <li class="nav-item">
-                    <a href="/terms" class="nav-link">Условия</a>
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link dropdown-toggle" id="infoDropdown">
+                        Инфо
+                        <span class="dropdown-arrow">▼</span>
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li class="dropdown-item">
+                            <a href="/faq" class="dropdown-link">FAQ</a>
+                        </li>
+                        <li class="dropdown-item">
+                            <a href="/privacy" class="dropdown-link">Конфиденциальность</a>
+                        </li>
+                        <li class="dropdown-item">
+                            <a href="/terms" class="dropdown-link">Условия</a>
+                        </li>
+                    </ul>
                 </li>
 
                 <li class="nav-item">
                     <a href="/blog" class="nav-link">Блог</a>
                 </li>
+                {% if request.session.get('admin_user_id') %}
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link dropdown-toggle" id="adminDropdown">
+                        Админ
+                        <span class="dropdown-arrow">▼</span>
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li class="dropdown-item">
+                            <a href="/admin/posts" class="dropdown-link">Посты</a>
+                        </li>
+                    </ul>
+                </li>
+                {% endif %}
             </ul>
         </div>
     </nav>

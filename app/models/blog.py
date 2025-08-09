@@ -38,7 +38,6 @@ class BlogPost(Base):
     language = Column(String(10), nullable=False, server_default="ru")
 
     status = Column(String(16), nullable=False, server_default=PostStatus.DRAFT.value)
-    is_featured = Column(Boolean, nullable=False, server_default=text("false"))
     view_count = Column(Integer, nullable=False, server_default=text("0"))
 
     meta_title = Column(String(255), nullable=True)

@@ -12,6 +12,8 @@ from app.config import settings
 from app.database import engine, Base
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy import text
+from app.utils.jinja_filters import ru_date
+from fastapi.templating import Jinja2Templates
 
 
 
@@ -37,6 +39,10 @@ app.add_middleware(
 )
 
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+
+# Register Jinja filter
+templates = Jinja2Templates(directory="app/frontend")
+templates.env.filters["ru_date"] = ru_date
 
 
 @app.on_event("startup")

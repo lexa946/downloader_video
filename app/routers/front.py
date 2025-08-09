@@ -10,6 +10,8 @@ router = APIRouter(tags=["Фронт"])
 # Настройка путей
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 templates = Jinja2Templates(directory=str(FRONTEND_DIR))
+from app.utils.jinja_filters import ru_date
+templates.env.filters["ru_date"] = ru_date
 
 
 @router.get("/favicon.ico", include_in_schema=False)

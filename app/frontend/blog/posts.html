@@ -10,7 +10,12 @@
         {% for p in posts %}
           <article class="blog-post">
             <div class="blog-post-meta">
-              <time datetime="{{ p.published_at or p.created_at }}">{{ p.published_at or p.created_at }}</time>
+              <time datetime="{{ p.published_at or p.created_at }}">{{ (p.published_at or p.created_at)|ru_date }}</time>
+              {% if p.tags %}
+                {% for tag in p.tags %}
+                  <span class="blog-category">{{ tag }}</span>
+                {% endfor %}
+              {% endif %}
             </div>
             <h2 class="blog-post-title">
               <a href="/blog/posts/{{ p.slug }}">{{ p.title }}</a>

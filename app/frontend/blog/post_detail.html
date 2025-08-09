@@ -6,9 +6,8 @@
   {% if post.meta_description %}
     <meta name="description" content="{{ post.meta_description }}">
   {% endif %}
-  {% if post.canonical_url %}
-    <link rel="canonical" href="{{ post.canonical_url }}">
-  {% endif %}
+  {# Canonical на полный URL текущей страницы #}
+  <link rel="canonical" href="{{ request.url.scheme ~ '://' ~ request.url.hostname ~ request.url.path }}">
   {% if post.og_image_url %}
     <meta property="og:image" content="{{ post.og_image_url }}" />
   {% elif post.cover_image_url %}
@@ -28,9 +27,14 @@
         </nav>
         <div class="article-meta">
           {% if post.published_at %}
-            <time datetime="{{ post.published_at }}">{{ post.published_at }}</time>
+            <time datetime="{{ post.published_at }}">{{ post.published_at|ru_date }}</time>
           {% else %}
-            <time datetime="{{ post.created_at }}">{{ post.created_at }}</time>
+            <time datetime="{{ post.created_at }}">{{ post.created_at|ru_date }}</time>
+          {% endif %}
+          {% if post.tags %}
+            {% for tag in post.tags %}
+              <span class="blog-category">{{ tag }}</span>
+            {% endfor %}
           {% endif %}
         </div>
         <h1>{{ post.title }}</h1>

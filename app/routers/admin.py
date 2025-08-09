@@ -95,7 +95,7 @@ async def create_post(
     cover_image_url: str | None = Form(None),
     tags: str | None = Form(None),
     language: str = Form("ru"),
-    is_featured: bool | None = Form(False),
+    # is_featured removed
     meta_title: str | None = Form(None),
     meta_description: str | None = Form(None),
     og_image_url: str | None = Form(None),
@@ -114,7 +114,7 @@ async def create_post(
         tags=tags_list,
         language=language,
         status=PostStatus.DRAFT.value,
-        is_featured=bool(is_featured),
+        
         meta_title=meta_title,
         meta_description=meta_description,
         og_image_url=og_image_url,
@@ -157,7 +157,7 @@ async def update_post(
     cover_image_url: str | None = Form(None),
     tags: str | None = Form(None),
     language: str = Form("ru"),
-    is_featured: bool | None = Form(False),
+    # is_featured removed
     meta_title: str | None = Form(None),
     meta_description: str | None = Form(None),
     og_image_url: str | None = Form(None),
@@ -178,7 +178,7 @@ async def update_post(
     post.tags = [t.strip() for t in (tags or "").split(",") if t.strip()] if tags is not None else []
     post.language = language
     # статус не меняем из формы; публикация управляется отдельными действиями
-    post.is_featured = bool(is_featured)
+    
     post.meta_title = meta_title
     post.meta_description = meta_description
     post.og_image_url = og_image_url

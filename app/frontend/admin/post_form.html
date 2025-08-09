@@ -85,14 +85,7 @@
                                     <label>Язык</label>
                                     <input type="text" name="language" value="{{ post.language if post else 'ru' }}"/>
                                 </div>
-                                <div class="form-row">
-                                    <label>Вывести на витрину</label>
-                                    <label class="switch">
-                                        <input type="checkbox" name="is_featured" value="1"
-                                               {% if post and post.is_featured %}checked{% endif %}/>
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
+                                
                             </div>
                             <div>
                                 <div class="form-row">

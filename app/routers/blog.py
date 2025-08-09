@@ -12,6 +12,8 @@ from app.models.blog import BlogPost, PostStatus
 
 router = APIRouter(tags=["Blog"])
 templates = Jinja2Templates(directory="app/frontend")
+from app.utils.jinja_filters import ru_date
+templates.env.filters["ru_date"] = ru_date
 
 
 @router.get("/blog/posts", response_class=HTMLResponse)

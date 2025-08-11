@@ -1,0 +1,33 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Админка — Вход{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="/static/css/admin.css">
+{% endblock %}
+
+{% block content %}
+<main class="main">
+  <div class="container" style="max-width: 480px; margin: 40px auto;">
+    <h1>Вход в админку</h1>
+    {% if error %}
+      <div style="color: #b00020; margin: 8px 0;">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/admin/login">
+      <div class="form-row">
+        <label>Логин или Email</label>
+        <input type="text" name="username_or_email" required />
+      </div>
+      <div class="form-row">
+        <label>Пароль</label>
+        <input type="password" name="password" required />
+      </div>
+      <div class="form-row">
+        <button type="submit" class="cta-button">Войти</button>
+      </div>
+    </form>
+  </div>
+  </main>
+{% endblock %}
+
+

@@ -1,0 +1,57 @@
+{% extends 'main/base.html' %}
+
+{% block title %}{{ post.meta_title or post.title }}{% endblock %}
+
+{% block head %}
+  {% if post.meta_description %}
+    <meta name="description" content="{{ post.meta_description }}">
+  {% endif %}
+  {# Canonical на полный URL текущей страницы #}
+  <link rel="canonical" href="{{ request.url.scheme ~ '://' ~ request.url.hostname ~ request.url.path }}">
+  {% if post.og_image_url %}
+    <meta property="og:image" content="{{ post.og_image_url }}" />
+  {% elif post.cover_image_url %}
+    <meta property="og:image" content="{{ post.cover_image_url }}" />
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<main class="main">
+  <article class="blog-article">
+    <div class="container">
+      <header class="article-header">
+        <nav class="breadcrumb">
+          <a href="/">Главная</a> &gt;
+          <a href="/blog">Блог</a> &gt;
+          <span>{{ post.title }}</span>
+        </nav>
+        <div class="article-meta">
+          {% if post.published_at %}
+            <time datetime="{{ post.published_at }}">{{ post.published_at|ru_date }}</time>
+          {% else %}
+            <time datetime="{{ post.created_at }}">{{ post.created_at|ru_date }}</time>
+          {% endif %}
+          {% if post.tags %}
+            {% for tag in post.tags %}
+              <span class="blog-category">{{ tag }}</span>
+            {% endfor %}
+          {% endif %}
+        </div>
+        <h1>{{ post.title }}</h1>
+        {% if post.excerpt %}
+          <p class="article-excerpt">{{ post.excerpt }}</p>
+        {% endif %}
+      </header>
+
+      <div class="article-content">
+        {% if post.cover_image_url %}
+          <p><img src="{{ post.cover_image_url }}" alt="cover" style="max-width:100%; height:auto;"/></p>
+        {% endif %}
+        <div class="content">{{ post.content | safe }}</div>
+      </div>
+    </div>
+  </article>
+</main>
+{% endblock %}
+
+

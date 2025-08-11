@@ -1,6 +1,7 @@
 .venv
 .idea
 .env
+.env.postgres
 download
 ffmpeg
 test.*
@@ -8,3 +9,7 @@ test.*
 cookie*
 .cursorrules
 .cursor/rules/*
+./pg_data/*
+./redis_data/*
+/redis_data/
+/pg_data/

@@ -10,6 +10,8 @@ router = APIRouter(tags=["Фронт"])
 # Настройка путей
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 templates = Jinja2Templates(directory=str(FRONTEND_DIR))
+from app.utils.jinja_filters import ru_date
+templates.env.filters["ru_date"] = ru_date
 
 
 @router.get("/favicon.ico", include_in_schema=False)
@@ -25,7 +27,7 @@ async def favicon():
 async def index(request: Request):
     """Главная Страница"""
     user_id = request.cookies.get("user_id", str(uuid.uuid4()))
-    response = templates.TemplateResponse("index.html", context={"request": request, "user_id": user_id})
+    response = templates.TemplateResponse("parsers/index.html", context={"request": request, "user_id": user_id})
     if "user_id" not in request.cookies:
         response.set_cookie("user_id", user_id)
     return response
@@ -36,7 +38,7 @@ async def index(request: Request):
 async def youtube_downloader(request: Request):
     """Страница YouTube Downloader"""
     user_id = request.cookies.get("user_id", str(uuid.uuid4()))
-    response = templates.TemplateResponse("youtube-downloader.html", context={"request": request, "user_id": user_id})
+    response = templates.TemplateResponse("parsers/youtube-downloader.html", context={"request": request, "user_id": user_id})
     if "user_id" not in request.cookies:
         response.set_cookie("user_id", user_id)
     return response
@@ -46,7 +48,7 @@ async def youtube_downloader(request: Request):
 async def instagram_downloader(request: Request):
     """Страница Instagram Downloader"""
     user_id = request.cookies.get("user_id", str(uuid.uuid4()))
-    response = templates.TemplateResponse("instagram-downloader.html", context={"request": request, "user_id": user_id})
+    response = templates.TemplateResponse("parsers/instagram-downloader.html", context={"request": request, "user_id": user_id})
     if "user_id" not in request.cookies:
         response.set_cookie("user_id", user_id)
     return response
@@ -56,7 +58,7 @@ async def instagram_downloader(request: Request):
 async def vk_downloader(request: Request):
     """Страница VK Downloader"""
     user_id = request.cookies.get("user_id", str(uuid.uuid4()))
-    response = templates.TemplateResponse("vk-downloader.html", context={"request": request, "user_id": user_id})
+    response = templates.TemplateResponse("parsers/vk-downloader.html", context={"request": request, "user_id": user_id})
     if "user_id" not in request.cookies:
         response.set_cookie("user_id", user_id)
     return response
@@ -65,19 +67,19 @@ async def vk_downloader(request: Request):
 @router.get("/faq", response_class=HTMLResponse)
 async def new_faq(request: Request):
     """Страница FAQ"""
-    return templates.TemplateResponse("faq.html", {"request": request})
+    return templates.TemplateResponse("info/faq.html", {"request": request})
 
 
 @router.get("/privacy", response_class=HTMLResponse)
 async def new_privacy(request: Request):
     """Страница политики конфиденциальности"""
-    return templates.TemplateResponse("privacy.html", {"request": request})
+    return templates.TemplateResponse("info/privacy.html", {"request": request})
 
 
 @router.get("/terms", response_class=HTMLResponse)
 async def new_terms(request: Request):
     """Страница условий использования"""
-    return templates.TemplateResponse("terms.html", {"request": request})
+    return templates.TemplateResponse("info/terms.html", {"request": request})
 
 
 @router.get("/robots.txt", response_class=FileResponse)
@@ -106,24 +108,4 @@ async def yandex_verification():
     """Yandex верификация"""
     yandex_file = FRONTEND_DIR / "seo" / "yandex_c51849ff7e8fe28a.html"
     return FileResponse(yandex_file, media_type="text/html")
-
-
-@router.get("/blog", response_class=HTMLResponse)
-async def blog_index(request: Request):
-    """Главная страница блога"""
-    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
-    response = templates.TemplateResponse("blog/index.html", context={"request": request, "user_id": user_id})
-    if "user_id" not in request.cookies:
-        response.set_cookie("user_id", user_id)
-    return response
-
-
-@router.get("/blog/kak-skachat-video-s-youtube-bez-programm", response_class=HTMLResponse)
-async def blog_article_youtube(request: Request):
-    """Статья о скачивании видео с YouTube"""
-    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
-    response = templates.TemplateResponse("blog/kak-skachat-video-s-youtube-bez-programm.html", context={"request": request, "user_id": user_id})
-    if "user_id" not in request.cookies:
-        response.set_cookie("user_id", user_id)
-    return response
 

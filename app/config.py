@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     REDIS_PREFIX: str 
     REDIS_TTL: int
 
+    # Database / Admin / Security
+    DATABASE_URL: str
+    SECRET_KEY: str
+    ADMIN_EMAIL: str
+    ADMIN_USERNAME: str
+    ADMIN_PASSWORD: str
+
+
     @model_validator(mode="before")
     def set_more_field(cls, values):
         os.makedirs(values['DOWNLOAD_FOLDER'], exist_ok=True)

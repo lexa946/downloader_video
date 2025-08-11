@@ -2,6 +2,7 @@
 let currentVideoData = null;
 let currentTaskId = null;
 let progressInterval = null;
+let eventSource = null;
 
 // DOM elements
 const videoUrlInput = document.getElementById('videoUrl');
@@ -407,10 +408,66 @@ async function startDownload(videoFormatId, audioFormatId) {
 }
 
 function startProgressTracking() {
+    // Cleanup previous trackers
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+    }
     if (progressInterval) {
         clearInterval(progressInterval);
+        progressInterval = null;
     }
-    
+    // Prefer SSE if available
+    if (window.EventSource) {
+        startSSE();
+    } else {
+        startPollingFallback();
+    }
+}
+
+function startSSE() {
+    if (!currentTaskId) return;
+    const url = `/api/download-events/${currentTaskId}`;
+    eventSource = new EventSource(url);
+
+    eventSource.onmessage = (e) => {
+        try {
+            const statusData = JSON.parse(e.data);
+            updateProgressDisplay(statusData);
+            if (statusData.status === 'completed') {
+                if (downloadReadyContainer) {
+                    downloadReadyContainer.style.display = 'block';
+                }
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+                loadUserHistory();
+                hideProgress();
+            } else if (statusData.status === 'error') {
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+                showError(statusData.description || 'Произошла ошибка при скачивании');
+                hideProgress();
+                showResults();
+            }
+        } catch (err) {
+            console.error('SSE parse error:', err);
+        }
+    };
+
+    eventSource.onerror = () => {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+        startPollingFallback();
+    };
+}
+
+function startPollingFallback() {
     progressInterval = setInterval(checkDownloadProgress, 1000);
     checkDownloadProgress(); // Первая проверка сразу
 }
@@ -539,6 +596,10 @@ function hideProgress() {
 window.addEventListener('beforeunload', function() {
     if (progressInterval) {
         clearInterval(progressInterval);
+    }
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
     }
 });
 

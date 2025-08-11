@@ -24,6 +24,18 @@ class RedisCache:
     def _get_key(self, key: str) -> str:
         return f"{settings.REDIS_PREFIX}{key}"
 
+    def channel_for_task(self, task_id: str) -> str:
+        """Return Redis Pub/Sub channel name for a given task."""
+        return self._get_key(f"events:{task_id}")
+
+    async def publish_progress(self, task_id: str, task: DownloadTask) -> None:
+        """Publish current task progress to Redis Pub/Sub channel for SSE consumers."""
+        payload = {
+            "task_id": task_id,
+            **task.video_status.model_dump(),
+        }
+        await self.redis.publish(self.channel_for_task(task_id), json.dumps(payload))
+
     async def get_video_meta(self, url: str) -> Optional[SVideoResponse]:
         """Get video metadata from cache"""
         key = self._get_key(f"meta:{url}")
@@ -63,6 +75,11 @@ class RedisCache:
             "filepath": str(task.filepath)
         }
         await self.redis.set(key, json.dumps(task_data), ex=self.ttl)
+        # Try to publish SSE update; ignore publish errors silently
+        try:
+            await self.publish_progress(task_id, task)
+        except Exception:
+            pass
         # Auto-release per-user lock if task has finished (completed, error, or done)
         try:
             status = task.video_status.status

@@ -8,6 +8,8 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Path, Request
 from fastapi.responses import StreamingResponse, Response
 from starlette import status
+import json
+from contextlib import suppress
 
 from app.models.services import VideoServicesManager
 from app.models.status import VideoDownloadStatus
@@ -123,6 +125,51 @@ async def get_download_status(task_id: Annotated[str, Path()]) -> SVideoStatus:
     task = await redis_cache.get_download_task(task_id)
     return task.video_status
 
+
+@router.get("/download-events/{task_id}")
+@check_task_id
+async def download_events(request: Request, task_id: Annotated[str, Path()]):
+    """SSE поток обновлений прогресса для задачи скачивания"""
+    if not await redis_cache.exist_download_task(task_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    channel = redis_cache.channel_for_task(task_id)
+    pubsub = redis_cache.redis.pubsub()
+    await pubsub.subscribe(channel)
+
+    async def event_generator():
+        try:
+            # Отправляем начальный слепок
+            task = await redis_cache.get_download_task(task_id)
+            if task:
+                snap = {"task_id": task_id, **task.video_status.model_dump()}
+                yield f"data: {json.dumps(snap)}\n\n"
+
+            async for msg in pubsub.listen():
+                if msg.get("type") != "message":
+                    continue
+                data = msg.get("data")
+                yield f"data: {data}\n\n"
+
+                # Останавливаемся при завершении
+                try:
+                    payload = json.loads(data)
+                    if payload.get("status") in ("completed", "error", "done"):
+                        break
+                except Exception:
+                    pass
+                if await request.is_disconnected():
+                    break
+        finally:
+            with suppress(Exception):
+                await pubsub.unsubscribe(channel)
+                await pubsub.close()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 @router.get("/get-video/{task_id}")
 @check_task_id

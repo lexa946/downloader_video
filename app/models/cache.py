@@ -18,6 +18,8 @@ class RedisCache:
             decode_responses=True
         )
         self.ttl = settings.REDIS_TTL
+        # Use a longer TTL for active-download locks to avoid premature expiry on long downloads
+        self.lock_ttl = max(int(self.ttl or 0), 3600)
 
     def _get_key(self, key: str) -> str:
         return f"{settings.REDIS_PREFIX}{key}"
@@ -61,6 +63,16 @@ class RedisCache:
             "filepath": str(task.filepath)
         }
         await self.redis.set(key, json.dumps(task_data), ex=self.ttl)
+        # Auto-release per-user lock if task has finished (completed, error, or done)
+        try:
+            status = task.video_status.status
+            if status in (VideoDownloadStatus.COMPLETED, VideoDownloadStatus.ERROR, VideoDownloadStatus.DONE):
+                user_id = await self.get_task_user(task_id)
+                if user_id:
+                    await self.release_user_active_task(user_id, task_id)
+        except Exception:
+            # Do not break on lock release errors
+            pass
 
     async def delete_download_task(self, task_id: str):
         key = self._get_key(f"task:{task_id}")
@@ -76,6 +88,41 @@ class RedisCache:
         key = self._get_key(f"user:{user_id}")
         await self.redis.lpush(key, task_id)
         await self.redis.ltrim(key, 0, 5)  # Keep only last 6 tasks
+
+    # --- Per-user active download lock ---
+    async def get_user_active_task(self, user_id: str) -> Optional[str]:
+        """Return currently active task_id for user if exists."""
+        key = self._get_key(f"active:{user_id}")
+        return await self.redis.get(key)
+
+    async def acquire_user_active_task(self, user_id: str, task_id: str) -> bool:
+        """Try to acquire active-download lock for user. Returns True if acquired."""
+        key = self._get_key(f"active:{user_id}")
+        # NX ensures we don't override an existing lock
+        result = await self.redis.set(key, task_id, ex=self.lock_ttl, nx=True)
+        return bool(result)
+
+    async def release_user_active_task(self, user_id: str, task_id: Optional[str] = None) -> None:
+        """Release active-download lock for user. If task_id is provided, only release if matches."""
+        key = self._get_key(f"active:{user_id}")
+        if task_id is None:
+            await self.redis.delete(key)
+            return
+        # Delete only if value matches using a small Lua script for atomicity
+        script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end"
+        try:
+            await self.redis.eval(script, 1, key, task_id)
+        except Exception:
+            pass
+
+    # --- Mapping task_id -> user_id to release locks on completion ---
+    async def set_task_user(self, task_id: str, user_id: str) -> None:
+        key = self._get_key(f"task_user:{task_id}")
+        await self.redis.set(key, user_id, ex=self.lock_ttl)
+
+    async def get_task_user(self, task_id: str) -> Optional[str]:
+        key = self._get_key(f"task_user:{task_id}")
+        return await self.redis.get(key)
 
     async def get_all_tasks(self) -> Dict[str, DownloadTask]:
         """Get all download tasks"""

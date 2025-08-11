@@ -753,7 +753,7 @@ function createHistoryActions(videoStatus) {
     
     if (status === 'pending') {
         actions += `
-            <button class="history-btn info" onclick="checkHistoryStatus('${videoStatus.task_id}')">
+            <button class="history-btn info" onclick="resumeHistoryProgress('${videoStatus.task_id}')">
                 <span>ℹ️</span> Загрузка
             </button>
         `;
@@ -822,6 +822,19 @@ async function checkHistoryStatus(taskId) {
     } catch (error) {
         console.error('Error checking status:', error);
         showError('Не удалось получить статус скачивания');
+    }
+}
+
+// Resume tracking of an existing task from history: show standard progress UI and keep updating
+function resumeHistoryProgress(taskId) {
+    try {
+        currentTaskId = taskId;
+        showProgress();
+        hideResults();
+        startProgressTracking();
+    } catch (error) {
+        console.error('Error resuming progress:', error);
+        showError('Не удалось возобновить отслеживание прогресса');
     }
 }
 

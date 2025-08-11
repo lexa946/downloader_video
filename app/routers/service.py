@@ -76,6 +76,15 @@ async def start_download(request: Request, video_download: SVideoDownload, backg
     """Запускает процесс скачивания"""
     user_id = request.cookies.get("user_id", "0")
     task_id = str(uuid.uuid4())
+
+    # Enforce single active download per user using Redis lock
+    if user_id and user_id != "0":
+        already_active_task = await redis_cache.get_user_active_task(user_id)
+        if already_active_task:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="У вас уже есть активная загрузка. Дождитесь завершения текущей загрузки."
+            )
     # Get video metadata from cache or fetch it
     video_meta = await redis_cache.get_video_meta(video_download.url)
     if not video_meta:
@@ -91,6 +100,16 @@ async def start_download(request: Request, video_download: SVideoDownload, backg
     )
     await redis_cache.set_download_task(task_id, DownloadTask(video_status))
     await redis_cache.add_user_task(user_id, task_id)
+    if user_id and user_id != "0":
+        # Acquire active lock and store mapping for later release
+        acquired = await redis_cache.acquire_user_active_task(user_id, task_id)
+        if not acquired:
+            # race condition fallback
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="У вас уже есть активная загрузка. Дождитесь завершения текущей загрузки."
+            )
+        await redis_cache.set_task_user(task_id, user_id)
 
     service = VideoServicesManager.get_service(video_download.url)
     background_tasks.add_task(service.parser(video_download.url).download, task_id, video_download)

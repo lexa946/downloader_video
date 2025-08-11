@@ -1,0 +1,79 @@
+{% extends 'parsers/download_page_base.html' %}
+{% block title %}
+    Скачать видео с RuTube бесплатно | RuTube Downloader
+{% endblock %}
+{% block head %}
+    <meta name="description"
+          content="Скачать видео с RuTube бесплатно в хорошем качестве. RuTube downloader без регистрации, поддержка MP4 и MP3.">
+    <meta name="keywords"
+          content="скачать видео rutube, rutube downloader, скачать с рутуб, рутуб скачивальщик, скачать видео rutube бесплатно">
+
+    <meta name="author" content="Video Downloader">
+    <meta property="og:title" content="Скачать видео с RuTube бесплатно | RuTube Downloader">
+    <meta property="og:description" content="Скачивайте видео с RuTube бесплатно в хорошем качестве">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://downloader.pozharsite.ru/rutube-downloader">
+    <meta property="og:image" content="https://downloader.pozharsite.ru/static/images/favicon.png">
+
+    <link rel="canonical" href="https://downloader.pozharsite.ru/rutube-downloader">
+{% endblock %}
+
+{% block hero %}
+    <section class="hero">
+        <h1>Скачать видео с RuTube бесплатно онлайн</h1>
+        <p class="subtitle">Быстрое скачивание RuTube видео в MP4 или MP3 без регистрации.</p>
+        <div class="quality-badges">
+            <span class="badge">1080p</span>
+            <span class="badge">720p</span>
+            <span class="badge">480p</span>
+            <span class="badge">MP3</span>
+        </div>
+    </section>
+{% endblock %}
+
+{% block platforms %}
+    <div class="platforms">
+        <p>Поддерживаемые RuTube форматы:</p>
+        <div class="platform-icons">
+            <div class="platform-item">
+                <span class="platform-icon">🎥</span>
+                <span>Видео MP4 (HLS)</span>
+            </div>
+            <div class="platform-item">
+                <span class="platform-icon">🎵</span>
+                <span>Аудио MP3</span>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block instructions %}
+    <section class="instructions">
+        <h2>Как скачать видео с RuTube?</h2>
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h3>Найдите RuTube видео</h3>
+                    <p>Откройте RuTube и скопируйте ссылку на видео.</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h3>Вставьте ссылку</h3>
+                    <p>Вставьте ссылку в поле сверху и нажмите «Найти».</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h3>Скачайте</h3>
+                    <p>Выберите качество и скачайте видео или аудио.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+{% endblock %}
+
+

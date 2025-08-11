@@ -180,7 +180,8 @@ function validateUrl(url) {
     const supportedPlatforms = [
         'youtube.com', 'youtu.be', 'www.youtube.com',
         'instagram.com', 'www.instagram.com',
-        'vk.com', 'www.vk.com', 'vkvideo.ru'
+        'vk.com', 'www.vk.com', 'vkvideo.ru',
+        'rutube.ru', 'www.rutube.ru'
     ];
     
     const isSupported = supportedPlatforms.some(platform => 
@@ -188,7 +189,7 @@ function validateUrl(url) {
     );
     
     if (!isSupported) {
-        return 'Данная платформа не поддерживается. Поддерживаются: YouTube, Instagram*, VK, VK Video';
+        return 'Данная платформа не поддерживается. Поддерживаются: YouTube, Instagram*, VK, VK Video, RuTube';
     }
     
     return null;

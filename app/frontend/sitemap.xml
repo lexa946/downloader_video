@@ -57,6 +57,14 @@
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
+
+  <!-- RuTube Downloader -->
+  <url>
+    <loc>https://downloader.pozharsite.ru/rutube-downloader</loc>
+    <lastmod>2025-08-11</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
   
   <!-- Блог -->
   <url>

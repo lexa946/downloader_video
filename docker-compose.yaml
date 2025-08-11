@@ -11,6 +11,7 @@ services:
   postgres:
     restart: unless-stopped
     image: postgres:16
+    user: orangepi
     env_file:
       - .env.postgres
     ports:

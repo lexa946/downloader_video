@@ -3,6 +3,7 @@ Allow: /
 Allow: /faq
 Allow: /privacy
 Allow: /static/
+Allow: /blog/
 
 # Запрещаем индексацию API эндпоинтов
 Disallow: /api/

@@ -64,6 +64,15 @@ async def vk_downloader(request: Request):
     return response
 
 
+@router.get("/rutube-downloader", response_class=HTMLResponse)
+async def rutube_downloader(request: Request):
+    """Страница RuTube Downloader"""
+    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
+    response = templates.TemplateResponse("parsers/rutube-downloader.html", context={"request": request, "user_id": user_id})
+    if "user_id" not in request.cookies:
+        response.set_cookie("user_id", user_id)
+    return response
+
 @router.get("/faq", response_class=HTMLResponse)
 async def new_faq(request: Request):
     """Страница FAQ"""

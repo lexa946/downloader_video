@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from starlette import status
 
-from app.parsers import YouTubeParser, InstagramParser, VkParser, RutubeParser
+from app.parsers import YouTubeParser, InstagramParser, VkParser, RutubeParser, TikTokParser
 
 
 class VideoServiceBase:
@@ -42,6 +42,16 @@ class RutubeVideoService(VideoServiceBase):
         'rutube.ru/embed',
     ]
     parser = RutubeParser
+
+
+class TikTokVideoService(VideoServiceBase):
+    name = "TikTok"
+    key_words = [
+        'tiktok.com',
+        'www.tiktok.com',
+        'vt.tiktok.com',
+    ]
+    parser = TikTokParser
 
 
 class VideoServicesManager:

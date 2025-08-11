@@ -6,7 +6,7 @@
         {% block hero %}
             <section class="hero">
                 <h2>Скачивайте видео с любимых платформ</h2>
-                <p class="subtitle">Поддерживаем YouTube, Instagram*, VK, VK Video, RuTube. Без регистрации, в высоком
+                <p class="subtitle">Поддерживаем YouTube, Instagram*, VK, RuTube, TikTok. Без регистрации, в высоком
                     качестве.</p>
 
                 <!-- Качества для SEO -->
@@ -26,7 +26,7 @@
                     <input
                             type="url"
                             id="videoUrl"
-                            placeholder="Вставьте ссылку на видео (YouTube, Instagram*, VK, VK Video, RuTube)"
+                            placeholder="Вставьте ссылку на видео (YouTube, Instagram*, VK, RuTube, TikTok)"
                             class="url-input"
                             aria-label="Ссылка на видео для скачивания"
                     >
@@ -65,6 +65,10 @@
                             <span class="platform-icon">📺</span>
                             <span>RuTube</span>
                         </div>
+                         <div class="platform-item">
+                             <span class="platform-icon">🎵</span>
+                             <span>TikTok</span>
+                         </div>
                     </div>
                 </div>
             {% endblock %}
@@ -204,6 +208,10 @@
                     <h3>📺 <a href="/rutube-downloader">RuTube Downloader</a></h3>
                     <p><strong>Скачать видео с RuTube</strong> быстро и удобно. Поддержка MP4 и MP3.</p>
                 </div>
+                 <div class="info-card">
+                     <h3>🎵 <a href="/tiktok-downloader">TikTok Downloader</a></h3>
+                     <p><strong>Скачать видео из TikTok</strong> с музыкой или только аудио.</p>
+                 </div>
             </div>
         </section>
     </main>

@@ -11,7 +11,6 @@ services:
   postgres:
     restart: unless-stopped
     image: postgres:16
-    user: 1000:1000
     env_file:
       - .env.postgres
     ports:

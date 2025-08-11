@@ -63,6 +63,15 @@ async def vk_downloader(request: Request):
         response.set_cookie("user_id", user_id)
     return response
 
+@router.get("/tiktok-downloader", response_class=HTMLResponse)
+async def tiktok_downloader(request: Request):
+    """Страница TikTok Downloader"""
+    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
+    response = templates.TemplateResponse("parsers/tiktok-downloader.html", context={"request": request, "user_id": user_id})
+    if "user_id" not in request.cookies:
+        response.set_cookie("user_id", user_id)
+    return response
+
 
 @router.get("/rutube-downloader", response_class=HTMLResponse)
 async def rutube_downloader(request: Request):

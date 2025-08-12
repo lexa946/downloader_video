@@ -83,10 +83,21 @@ async def start_download(request: Request, video_download: SVideoDownload, backg
     if user_id and user_id != "0":
         already_active_task = await redis_cache.get_user_active_task(user_id)
         if already_active_task:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="У вас уже есть активная загрузка. Дождитесь завершения текущей загрузки."
-            )
+            # Validate the active task; if it's stale, clear the lock to allow new download
+            try:
+                existing = await redis_cache.get_download_task(already_active_task)
+            except Exception:
+                existing = None
+            if (existing is None or
+                existing.video_status.status in (VideoDownloadStatus.COMPLETED, VideoDownloadStatus.DONE, VideoDownloadStatus.ERROR) or
+                (existing.video_status.status == VideoDownloadStatus.PENDING and existing.download is None)):
+                # Release stale lock and continue
+                await redis_cache.release_user_active_task(user_id, already_active_task)
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="У вас уже есть активная загрузка. Дождитесь завершения текущей загрузки."
+                )
     # Get video metadata from cache or fetch it
     video_meta = await redis_cache.get_video_meta(video_download.url)
     if not video_meta:
@@ -100,7 +111,7 @@ async def start_download(request: Request, video_download: SVideoDownload, backg
         status=VideoDownloadStatus.PENDING,
         video=video_meta or EMPTY_VIDEO_RESPONSE
     )
-    await redis_cache.set_download_task(task_id, DownloadTask(video_status))
+    await redis_cache.set_download_task(task_id, DownloadTask(video_status, download=video_download))
     await redis_cache.add_user_task(user_id, task_id)
     if user_id and user_id != "0":
         # Acquire active lock and store mapping for later release

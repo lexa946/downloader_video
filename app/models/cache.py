@@ -5,7 +5,7 @@ from redis.asyncio import Redis
 
 from app.config import settings
 from app.models.status import VideoDownloadStatus
-from app.schemas.main import SVideoResponse, SVideoStatus
+from app.schemas.main import SVideoResponse, SVideoStatus, SVideoDownload
 from app.models.types import DownloadTask
 
 
@@ -58,7 +58,8 @@ class RedisCache:
         task_data = json.loads(data)
         return DownloadTask(
             video_status=SVideoStatus.model_validate(task_data["video_status"]),
-            filepath=Path(task_data.get("filepath", ""))
+            filepath=Path(task_data.get("filepath", "")),
+            download=(SVideoDownload.model_validate(task_data["download"]) if task_data.get("download") else None),
         )
 
     async def exist_download_task(self, task_id: str) -> bool:
@@ -72,7 +73,8 @@ class RedisCache:
         key = self._get_key(f"task:{task_id}")
         task_data = {
             "video_status": task.video_status.model_dump(),
-            "filepath": str(task.filepath)
+            "filepath": str(task.filepath),
+            "download": task.download.model_dump() if task.download else None,
         }
         await self.redis.set(key, json.dumps(task_data), ex=self.ttl)
         # Try to publish SSE update; ignore publish errors silently

@@ -1,4 +1,5 @@
 from pathlib import Path
+import asyncio
 
 from fastapi import FastAPI, HTTPException
 from starlette.middleware.cors import CORSMiddleware
@@ -16,6 +17,9 @@ from app.database import engine, Base
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy import text
 from app.utils.jinja_filters import ru_date
+from app.models.cache import redis_cache
+from app.models.status import VideoDownloadStatus
+from app.models.services import VideoServicesManager
 from fastapi.templating import Jinja2Templates
 
 
@@ -85,3 +89,47 @@ async def on_startup():
             )
             session.add(admin)
             await session.commit()
+
+    # --- Recover in-progress downloads after restart ---
+    try:
+        tasks = await redis_cache.get_all_tasks()
+        for task_id, task in tasks.items():
+            status = task.video_status.status
+            # Release or re-acquire per-user locks as needed
+            user_id = await redis_cache.get_task_user(task_id)
+
+            if status == VideoDownloadStatus.PENDING:
+                # Resume only if we have original request params
+                if task.download is not None:
+                    if user_id:
+                        active = await redis_cache.get_user_active_task(user_id)
+                        if not active:
+                            await redis_cache.acquire_user_active_task(user_id, task_id)
+                        elif active != task_id:
+                            # Another task is marked active for this user; skip resume to avoid conflicts
+                            continue
+                    try:
+                        service = VideoServicesManager.get_service(task.video_status.video.url)
+                        parser = service.parser(task.video_status.video.url)
+                        asyncio.create_task(parser.download(task_id, task.download))
+                    except Exception:
+                        # Mark as error if cannot resume
+                        task.video_status.status = VideoDownloadStatus.ERROR
+                        task.video_status.description = "Failed to resume after restart"
+                        await redis_cache.set_download_task(task_id, task)
+                        if user_id:
+                            await redis_cache.release_user_active_task(user_id, task_id)
+                else:
+                    # Cannot resume without parameters; mark error and free lock
+                    task.video_status.status = VideoDownloadStatus.ERROR
+                    task.video_status.description = "Server restarted; task parameters lost. Start a new download."
+                    await redis_cache.set_download_task(task_id, task)
+                    if user_id:
+                        await redis_cache.release_user_active_task(user_id, task_id)
+            elif status in (VideoDownloadStatus.COMPLETED, VideoDownloadStatus.DONE, VideoDownloadStatus.ERROR):
+                # Ensure any lingering lock is released
+                if user_id:
+                    await redis_cache.release_user_active_task(user_id, task_id)
+    except Exception:
+        # Do not fail app startup due to recovery issues
+        pass

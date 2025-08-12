@@ -1,5 +1,6 @@
 from functools import wraps
 import inspect
+from uuid import UUID
 
 from fastapi import HTTPException
 from starlette import status
@@ -16,8 +17,20 @@ def check_task_id(func):
         except Exception:
             task_id = kwargs.get("task_id")
             if task_id is None and args:
-                # На случай если task_id передан позиционно первым
                 task_id = args[0]
+
+        if not task_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="task_id is required",
+            )
+        try:
+            UUID(str(task_id))
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid task_id",
+            )
 
         is_exists = await redis_cache.exist_download_task(task_id)
         if not is_exists:

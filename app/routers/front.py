@@ -14,13 +14,6 @@ from app.utils.jinja_filters import ru_date
 templates.env.filters["ru_date"] = ru_date
 
 
-@router.get("/favicon.ico", include_in_schema=False)
-async def favicon():
-    favicon_path = FRONTEND_DIR / "static" / "images" / "favicon.png"
-    if favicon_path.exists():
-        return FileResponse(favicon_path, media_type="image/png")
-
-    raise HTTPException(status_code=404, detail="Favicon not found")
 
 
 @router.get("/")

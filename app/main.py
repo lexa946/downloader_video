@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
 from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import FileResponse
 from starlette.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -43,6 +46,15 @@ app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 # Register Jinja filter
 templates = Jinja2Templates(directory="app/frontend")
 templates.env.filters["ru_date"] = ru_date
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    favicon_path = Path(__file__).parent / "frontend" / "static" / "images" / "favicon.png"
+    if favicon_path.exists():
+        return FileResponse(favicon_path, media_type="image/png")
+
+    raise HTTPException(status_code=404, detail="Favicon not found")
 
 
 @app.on_event("startup")

@@ -10,7 +10,7 @@
     {% block head %}
 
     {% endblock %}
-    
+
     <link rel="icon" type="image/png" href="/favicon.ico">
     <link rel="apple-touch-icon" href="/static/images/favicon.png">
     <!-- Yandex.Metrika counter -->
@@ -42,57 +42,82 @@
     </noscript>
     <!-- /Yandex.Metrika counter -->
     <!-- Yandex.RTB -->
-    <script>window.yaContextCb=window.yaContextCb||[]</script>
+    <script>window.yaContextCb = window.yaContextCb || []</script>
     <script src="https://yandex.ru/ads/system/context.js" async></script>
+
+    <!-- Google Tag Manager -->
+    <script>(function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            'gtm.start':
+                new Date().getTime(), event: 'gtm.js'
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : '';
+        j.async = true;
+        j.src =
+            'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, 'script', 'dataLayer', 'GTM-T9JLDHS2');</script>
+    <!-- End Google Tag Manager -->
+
+    <!-- Google Tag Manager (noscript) -->
+    <noscript>
+        <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T9JLDHS2"
+                height="0" width="0" style="display:none;visibility:hidden"></iframe>
+    </noscript>
+    <!-- End Google Tag Manager (noscript) -->
 </head>
 <body>
 
 <div class="container">
     {% include 'main/header.html' %}
     {% block content %}
-    	
+
     {% endblock %}
     {% include 'main/footer.html' %}
-<!-- Yandex.RTB R-A-16518515-4 -->
-<script>
-window.yaContextCb.push(() => {
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-16518515-4",
-        "type": "floorAd",
-        "platform": "touch"
-    })
-})
-</script>
-<!-- Yandex.RTB R-A-16518515-3 -->
-<script>
-window.yaContextCb.push(() => {
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-16518515-3",
-        "type": "floorAd",
-        "platform": "desktop"
-    })
-})
-</script>
-<!-- Yandex.RTB R-A-16518515-2 -->
-<script>
-window.yaContextCb.push(() => {
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-16518515-2",
-        "type": "fullscreen",
-        "platform": "desktop"
-    })
-})
-</script>
-<!-- Yandex.RTB R-A-16518515-1 -->
-<script>
-window.yaContextCb.push(() => {
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-16518515-1",
-        "type": "fullscreen",
-        "platform": "touch"
-    })
-})
-</script>
+    <!-- Yandex.RTB R-A-16518515-4 -->
+    <script>
+        window.yaContextCb.push(() => {
+            Ya.Context.AdvManager.render({
+                "blockId": "R-A-16518515-4",
+                "type": "floorAd",
+                "platform": "touch"
+            })
+        })
+    </script>
+    <!-- Yandex.RTB R-A-16518515-3 -->
+    <script>
+        window.yaContextCb.push(() => {
+            Ya.Context.AdvManager.render({
+                "blockId": "R-A-16518515-3",
+                "type": "floorAd",
+                "platform": "desktop"
+            })
+        })
+    </script>
+    <!-- Yandex.RTB R-A-16518515-2 -->
+    <script>
+        window.yaContextCb.push(() => {
+            Ya.Context.AdvManager.render({
+                "blockId": "R-A-16518515-2",
+                "type": "fullscreen",
+                "platform": "desktop"
+            })
+        })
+    </script>
+    <!-- Yandex.RTB R-A-16518515-1 -->
+    <script>
+        window.yaContextCb.push(() => {
+            Ya.Context.AdvManager.render({
+                "blockId": "R-A-16518515-1",
+                "type": "fullscreen",
+                "platform": "touch"
+            })
+        })
+    </script>
 </div>
+
+
 </body>
 </html>

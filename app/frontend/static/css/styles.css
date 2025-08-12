@@ -321,10 +321,30 @@ body {
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
+/* details summary styling */
+details.clip-form {
+    border: 2px solid #e1e8ed;
+    border-radius: 12px;
+    padding: 12px 16px;
+    background: #f8fafc;
+    margin-bottom: 20px;
+}
+
+.clip-summary {
+    list-style: none;
+    cursor: pointer;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.clip-summary::-webkit-details-marker {
+    display: none;
+}
+
 .url-input-container {
     display: flex;
     gap: 12px;
-    margin-bottom: 30px;
+    margin-bottom: 15px;
     flex-wrap: nowrap;
 }
 

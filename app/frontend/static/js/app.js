@@ -35,9 +35,7 @@ const downloadReadyBtn = document.getElementById('downloadReadyBtn');
 const clearInputBtn = document.getElementById('clearInput');
 const startTimeInput = document.getElementById('startTime');
 const endTimeInput = document.getElementById('endTime');
-const toggleClipFormBtn = document.getElementById('toggleClipForm');
 const clipForm = document.getElementById('clipForm');
-const closeClipFormBtn = document.getElementById('closeClipForm');
 const clearStartTimeBtn = document.getElementById('clearStartTime');
 const clearEndTimeBtn = document.getElementById('clearEndTime');
 
@@ -330,31 +328,13 @@ attachHMSBehavior(startTimeInput);
 attachHMSBehavior(endTimeInput);
 
 // Toggle clip form visibility with slide effect via CSS class
-if (toggleClipFormBtn && clipForm) {
-    // start hidden
-    clipForm.style.maxHeight = '0px';
-    clipForm.style.overflow = 'hidden';
-    clipForm.style.transition = 'max-height 0.25s ease';
-    clipForm.dataset.open = 'false';
-    clipForm.style.display = 'none';
-    const openClip = () => {
-        clipForm.style.display = 'block';
-        requestAnimationFrame(() => {
-            clipForm.style.maxHeight = '200px';
-        });
-        clipForm.dataset.open = 'true';
-        clipForm.setAttribute('aria-hidden', 'false');
-        toggleClipFormBtn.style.display = 'none';
+if (clipForm) {
+    // use details/open to drive state; animate via CSS if needed
+    const syncOpen = () => {
+        clipForm.dataset.open = clipForm.open ? 'true' : 'false';
     };
-    const closeClip = () => {
-        clipForm.style.maxHeight = '0px';
-        clipForm.dataset.open = 'false';
-        clipForm.setAttribute('aria-hidden', 'true');
-        setTimeout(() => { clipForm.style.display = 'none'; }, 250);
-        toggleClipFormBtn.style.display = '';
-    };
-    toggleClipFormBtn.addEventListener('click', openClip);
-    if (closeClipFormBtn) closeClipFormBtn.addEventListener('click', closeClip);
+    clipForm.addEventListener('toggle', syncOpen);
+    syncOpen();
 }
 
 // Clear buttons for time inputs

@@ -19,6 +19,8 @@ class SVideoDownload(BaseModel):
     url: str
     video_format_id: str
     audio_format_id: str
+    start_seconds: Optional[int] = field(default=None)
+    end_seconds: Optional[int] = field(default=None)
 
 
 class SVideoResponse(BaseModel):

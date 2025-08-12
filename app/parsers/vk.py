@@ -15,7 +15,7 @@ from app.models.types import DownloadTask
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
 from app.utils.helpers import remove_all_spec_chars
-from app.utils.video_utils import convert_to_mp3
+from app.utils.video_utils import convert_to_mp3, cut_media
 
 
 @dataclass
@@ -206,6 +206,21 @@ class VkParser(BaseParser):
                 task.filepath = download_path
             else:
                 task.filepath = temp_path
+
+        # Optional clipping
+        if download_video.start_seconds is not None or download_video.end_seconds is not None:
+            task.video_status.description = "Clipping selected fragment"
+            await redis_cache.set_download_task(task_id, task)
+            clipped_path = task.filepath.with_name(task.filepath.stem + "_clip" + task.filepath.suffix)
+            await asyncio.to_thread(
+                cut_media,
+                task.filepath.as_posix(),
+                clipped_path.as_posix(),
+                download_video.start_seconds,
+                download_video.end_seconds,
+            )
+            task.filepath.unlink(missing_ok=True)
+            task.filepath = clipped_path
 
         task.video_status.status = VideoDownloadStatus.COMPLETED
         task.video_status.description = VideoDownloadStatus.COMPLETED

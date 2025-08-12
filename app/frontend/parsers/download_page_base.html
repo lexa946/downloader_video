@@ -40,6 +40,35 @@
                 </button>
             </div>
 
+            <div class="clip-controls" style="flex-basis:100%; width:100%;">
+                <button id="toggleClipForm" class="analyze-btn" aria-label="Показать настройки пост-обработки" style="margin-top:8px;">
+                    <span class="btn-text">Пост-обработка видео</span>
+                    <span class="btn-loader" style="display:none;">⏳</span>
+                </button>
+                <div id="clipForm" class="clip-form" aria-hidden="true" style="margin-top:8px; display:none;">
+                    <div class="clip-form-header">
+                        <span class="clip-title">Пост-обработка</span>
+                        <button id="closeClipForm" class="clip-close" aria-label="Скрыть выбор фрагмента">▲</button>
+                    </div>
+                    <div class="clip-row" style="display:flex; gap:12px; flex-wrap:nowrap; align-items:flex-end;">
+                        <label class="time-field" style="display:flex; flex-direction:column; gap:6px;">
+                            <span class="time-label" style="font-size:0.9rem; color:#7f8c8d;">Начало фрагмента</span>
+                            <div class="input-wrapper time-wrapper" style="flex:0 0 auto;">
+                                <input type="text" id="startTime" inputmode="numeric" maxlength="8" pattern="^\\d{2}:\\d{2}:\\d{2}$" placeholder="ЧЧ:ММ:СС" class="url-input time-input" aria-label="Время начала в формате ЧЧ:ММ:СС">
+                                <button id="clearStartTime" class="clear-input-btn" title="Очистить время">✕</button>
+                            </div>
+                        </label>
+                        <label class="time-field" style="display:flex; flex-direction:column; gap:6px;">
+                            <span class="time-label" style="font-size:0.9rem; color:#7f8c8d;">Конец фрагмента</span>
+                            <div class="input-wrapper time-wrapper" style="flex:0 0 auto;">
+                                <input type="text" id="endTime" inputmode="numeric" maxlength="8" pattern="^\\d{2}:\\d{2}:\\d{2}$" placeholder="ЧЧ:ММ:СС" class="url-input time-input" aria-label="Время конца в формате ЧЧ:ММ:СС">
+                                <button id="clearEndTime" class="clear-input-btn" title="Очистить время">✕</button>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
             {% block platforms %}
                 <!-- Поддерживаемые платформы -->
                 <div class="platforms">

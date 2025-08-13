@@ -94,7 +94,7 @@ class TikTokParser(BaseParser):
             formats=formats,
         )
 
-    # @fallback_background_task
+    @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
         headers_tw = {

@@ -20,7 +20,7 @@ class YouTubeParser(BaseParser):
         self.url = url
         self._yt = YouTube(self.url)
 
-    # @fallback_background_task
+    @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
 

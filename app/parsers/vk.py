@@ -149,7 +149,7 @@ class VkParser(BaseParser):
             print(f"URL: {self.url}")
             raise
 
-    # @fallback_background_task
+    @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
         async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context)) as session:

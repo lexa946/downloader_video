@@ -291,7 +291,7 @@ class RutubeParser(BaseParser):
             formats=available_formats,
         )
 
-    # @fallback_background_task
+    @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
         video = await self._fetch_rutube_video()

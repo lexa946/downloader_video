@@ -21,6 +21,9 @@
         {% endblock %}
 
         <section class="download-section">
+            {% block tabs %}{% endblock %}
+            {% block search_tab %}{% endblock %}
+            <div id="analyzeTab">
             <div class="url-input-container">
                 <div class="input-wrapper">
                     <input
@@ -60,6 +63,7 @@
                         </label>
                     </div>
                 </details>
+            </div>
             </div>
 
             {% block platforms %}

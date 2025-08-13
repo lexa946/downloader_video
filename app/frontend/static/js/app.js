@@ -18,6 +18,18 @@ const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
 const statusText = document.getElementById('statusText');
 
+// YouTube search elements
+const ytSearchQuery = document.getElementById('ytSearchQuery');
+const searchBtn = document.getElementById('searchBtn');
+const clearSearchBtn = document.getElementById('clearSearch');
+const ytSearchResults = document.getElementById('ytSearchResults');
+let lastSearch = { query: '', items: [] };
+
+// Tabs
+const tabButtons = document.querySelectorAll('.tab-btn');
+const searchTab = document.getElementById('searchTab');
+const analyzeTab = document.getElementById('analyzeTab');
+
 // Navigation elements
 const navToggle = document.getElementById('navToggle');
 const navMenu = document.getElementById('navMenu');
@@ -72,6 +84,26 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!navToggle.contains(e.target) && !navMenu.contains(e.target)) {
                 closeMobileMenu();
             }
+        });
+    }
+    // Tabs
+    if (tabButtons && tabButtons.length) {
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+        });
+    }
+    // YouTube search
+    if (searchBtn && ytSearchQuery) {
+        searchBtn.addEventListener('click', handleYoutubeSearch);
+        ytSearchQuery.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') handleYoutubeSearch();
+        });
+    }
+    if (clearSearchBtn && ytSearchQuery) {
+        clearSearchBtn.addEventListener('click', () => {
+            ytSearchQuery.value = '';
+            ytSearchQuery.focus();
+            if (ytSearchResults) ytSearchResults.innerHTML = '';
         });
     }
     
@@ -175,6 +207,21 @@ function showSuccess(message) {
                 successDiv.remove();
             }
         }, 3000);
+    }
+}
+
+function switchTab(tab) {
+    tabButtons.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    if (tab === 'search') {
+        if (searchTab) searchTab.style.display = 'block';
+        if (analyzeTab) analyzeTab.style.display = 'none';
+        // восстановим результаты последнего поиска, если пусто
+        if (ytSearchResults && ytSearchResults.children.length === 0 && lastSearch.items.length) {
+            renderYoutubeSearchResults(lastSearch.items);
+        }
+    } else {
+        if (searchTab) searchTab.style.display = 'none';
+        if (analyzeTab) analyzeTab.style.display = 'block';
     }
 }
 
@@ -425,6 +472,81 @@ async function handleAnalyzeVideo() {
     } finally {
         setButtonLoading(analyzeBtn, false);
     }
+}
+
+async function handleYoutubeSearch() {
+    const q = ytSearchQuery ? ytSearchQuery.value.trim() : '';
+    if (!q) {
+        showError('Введите поисковый запрос');
+        return;
+    }
+    setButtonLoading(searchBtn, true);
+    if (ytSearchResults) ytSearchResults.innerHTML = '';
+    try {
+        const resp = await fetch(`/api/youtube/search?q=${encodeURIComponent(q)}`);
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || 'Не удалось выполнить поиск');
+        }
+        const data = await resp.json();
+        lastSearch = { query: q, items: Array.isArray(data.items) ? data.items : [] };
+        renderYoutubeSearchResults(lastSearch.items);
+    } catch (e) {
+        showError(e.message);
+    } finally {
+        setButtonLoading(searchBtn, false);
+    }
+}
+
+function renderYoutubeSearchResults(items) {
+    if (!ytSearchResults) return;
+    if (!items || items.length === 0) {
+        ytSearchResults.innerHTML = '<p>Ничего не найдено</p>';
+        return;
+    }
+    ytSearchResults.innerHTML = '';
+    items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'format-item yt-result';
+        const thumb = item.thumbnail_url ? `<img loading="lazy" src="${item.thumbnail_url}" alt="Preview" class="yt-thumb" onerror="this.style.display='none'">` : '';
+        const duration = item.duration_text ? `<div class="yt-duration">${item.duration_text}</div>` : '';
+        const author = item.author ? `<div class="yt-author">${item.author}</div>` : '';
+        div.innerHTML = `
+            ${thumb}
+            <div class="yt-title">${item.title || ''}</div>
+            ${author}
+            ${duration}
+            <button type="button" class="download-format-btn yt-open-btn" data-url="${item.video_url}">Открыть</button>
+        `;
+        const openBtn = div.querySelector('button');
+        openBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (videoUrlInput) {
+                videoUrlInput.value = item.video_url;
+                localStorage.setItem('lastVideoUrl', item.video_url);
+                // переключаем на вкладку форматов
+                switchTab('analyze');
+                handleAnalyzeVideo();
+                // не очищаем результаты, чтобы сохранить выдачу
+                resultsSection.scrollIntoView({behavior: 'smooth'});
+            } else {
+                window.open(item.video_url, '_blank');
+            }
+        });
+        // click anywhere selects
+        div.addEventListener('click', (e) => {
+            if (e.target.tagName.toLowerCase() === 'button') return;
+            if (videoUrlInput) {
+                videoUrlInput.value = item.video_url;
+                localStorage.setItem('lastVideoUrl', item.video_url);
+                switchTab('analyze');
+                handleAnalyzeVideo();
+                resultsSection.scrollIntoView({behavior: 'smooth'});
+            }
+        });
+        ytSearchResults.appendChild(div);
+    });
 }
 
 function displayVideoInfo(videoData) {

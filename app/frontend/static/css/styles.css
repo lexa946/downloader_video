@@ -521,6 +521,79 @@ details.clip-form {
     gap: 15px;
 }
 
+/* YouTube search thumbnails */
+.yt-thumb {
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+/* Extra safety: constrain any images inside search results grid */
+#ytSearchResults .yt-thumb {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16/9;
+    display: block;
+}
+
+#ytSearchResults .format-item {
+    padding: 16px;
+}
+
+/* Vertical layout for YouTube search cards */
+.yt-result {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.yt-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.yt-author {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+.yt-duration {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+#ytSearchResults .download-format-btn {
+    align-self: flex-start;
+    margin-top: 6px;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.tab-btn {
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 2px solid #e1e8ed;
+    background: #fff;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.tab-btn.active {
+    border-color: #3498db;
+    color: #3498db;
+    background: #f0f8ff;
+}
+
+/* Ensure analyzeTab and searchTab are full width blocks */
+#analyzeTab { width: 100%; }
+#searchTab { width: 100%; }
+
 .format-item {
     background: white;
     border: 2px solid #e1e8ed;
@@ -559,7 +632,7 @@ details.clip-form {
 }
 
 .download-format-btn {
-    width: 100%;
+    width: auto;
     padding: 12px;
     background: #27ae60;
     color: white;

@@ -69,7 +69,7 @@ class InstagramParser(BaseParser):
         self.url = url
         self._response_text = None
 
-    @fallback_background_task
+    # @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
         async with aiohttp.ClientSession() as session:

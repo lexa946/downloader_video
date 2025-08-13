@@ -21,6 +21,10 @@ from app.schemas.main import SVideoFormat, SVideoResponse, SVideoDownload, SYout
 from app.utils.validators_utils import fallback_background_task
 from app.utils.video_utils import save_preview_on_s3, combine_audio_and_video, convert_to_mp3
 
+class DownloadCanceled(Exception):
+    pass
+
+
 class YouTubeParser(BaseParser):
 
     def __init__(self, url):
@@ -180,13 +184,22 @@ class YouTubeParser(BaseParser):
             bytes_received = stream_.filesize - bytes_remaining
             percent = round(100.0 * bytes_received / float(stream_.filesize), 1)
             task.video_status.percent = float(percent)
-            event_loop.create_task(redis_cache.set_download_task(task_id, task))
+            # Mark status as downloading
+            task.video_status.status = "downloading"
+            # Update task and check for cancellation
+            async def _update_and_check():
+                await redis_cache.set_download_task(task_id, task)
+                if await redis_cache.is_task_canceled(task_id):
+                    raise DownloadCanceled()
+            event_loop.create_task(_update_and_check())
 
         self._yt.register_on_progress_callback(post_process_hook)
         try:
             if not download_video.video_format_id:
                 task.video_status.description = "Downloading audio track"
                 await redis_cache.set_download_task(task_id, task)
+                if await redis_cache.is_task_canceled(task_id):
+                    raise DownloadCanceled()
                 audio_path = Path(await asyncio.to_thread(
                     self._yt.streams.get_by_itag(download_video.audio_format_id).download,
                     output_path=download_path.as_posix(),
@@ -196,6 +209,8 @@ class YouTubeParser(BaseParser):
                 # Конвертируем в MP3
                 task.video_status.description = "Converting to MP3"
                 await redis_cache.set_download_task(task_id, task)
+                if await redis_cache.is_task_canceled(task_id):
+                    raise DownloadCanceled()
                 out_path = audio_path.with_suffix('.mp3')
                 await asyncio.to_thread(convert_to_mp3,
                                     audio_path.as_posix(),
@@ -208,6 +223,8 @@ class YouTubeParser(BaseParser):
                 # Стандартная логика для видео
                 task.video_status.description = "Downloading video track"
                 await redis_cache.set_download_task(task_id, task)
+                if await redis_cache.is_task_canceled(task_id):
+                    raise DownloadCanceled()
                 video_path = Path(await asyncio.to_thread(
                     self._yt.streams.get_by_itag(download_video.video_format_id).download,
                     output_path=download_path.as_posix(),
@@ -216,6 +233,8 @@ class YouTubeParser(BaseParser):
                 if download_video.audio_format_id != download_video.video_format_id:
                     task.video_status.description = "Downloading audio track"
                     await redis_cache.set_download_task(task_id, task)
+                    if await redis_cache.is_task_canceled(task_id):
+                        raise DownloadCanceled()
                     audio_path = Path(await asyncio.to_thread(
                         self._yt.streams.get_by_itag(download_video.audio_format_id).download,
                         output_path=download_path.as_posix(),
@@ -223,6 +242,8 @@ class YouTubeParser(BaseParser):
                     ))
                     task.video_status.description = "Merging tracks"
                     await redis_cache.set_download_task(task_id, task)
+                    if await redis_cache.is_task_canceled(task_id):
+                        raise DownloadCanceled()
                     out_path = video_path.with_name(video_path.stem + "_out.mp4")
                     await asyncio.to_thread(combine_audio_and_video,
                                             video_path.as_posix(),
@@ -235,12 +256,25 @@ class YouTubeParser(BaseParser):
                 task.filepath = video_path
 
             post_process = PostPrecess(task, download_video)
+            if await redis_cache.is_task_canceled(task_id):
+                raise DownloadCanceled()
             await post_process.process()
 
             task.video_status.status = VideoDownloadStatus.COMPLETED
             task.video_status.description = VideoDownloadStatus.COMPLETED
             await redis_cache.set_download_task(task_id, task)
 
+        except DownloadCanceled:
+            # Clean up partial files if any
+            try:
+                if getattr(task, 'filepath', None):
+                    task.filepath.unlink(missing_ok=True)
+            except Exception:
+                pass
+            task.video_status.status = VideoDownloadStatus.CANCELED
+            task.video_status.description = "Canceled by user"
+            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.clear_task_canceled(task_id)
         except Exception as e:
             task.video_status.status = VideoDownloadStatus.ERROR
             task.video_status.description = str(e)

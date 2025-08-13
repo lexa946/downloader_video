@@ -83,16 +83,29 @@ class RedisCache:
             await self.publish_progress(task_id, task)
         except Exception:
             pass
-        # Auto-release per-user lock if task has finished (completed, error, or done)
+        # Auto-release per-user lock if task has finished (completed, error, canceled, or done)
         try:
             status = task.video_status.status
-            if status in (VideoDownloadStatus.COMPLETED, VideoDownloadStatus.ERROR, VideoDownloadStatus.DONE):
+            if status in (VideoDownloadStatus.COMPLETED, VideoDownloadStatus.ERROR, VideoDownloadStatus.DONE, getattr(VideoDownloadStatus, 'CANCELED', 'canceled')):
                 user_id = await self.get_task_user(task_id)
                 if user_id:
                     await self.release_user_active_task(user_id, task_id)
         except Exception:
             # Do not break on lock release errors
             pass
+
+    # --- Cancelation flags ---
+    async def set_task_canceled(self, task_id: str) -> None:
+        key = self._get_key(f"cancel:{task_id}")
+        await self.redis.set(key, "1", ex=self.lock_ttl)
+
+    async def clear_task_canceled(self, task_id: str) -> None:
+        key = self._get_key(f"cancel:{task_id}")
+        await self.redis.delete(key)
+
+    async def is_task_canceled(self, task_id: str) -> bool:
+        key = self._get_key(f"cancel:{task_id}")
+        return bool(await self.redis.exists(key))
 
     async def delete_download_task(self, task_id: str):
         key = self._get_key(f"task:{task_id}")

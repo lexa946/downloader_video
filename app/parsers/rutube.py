@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 
 from app.config import settings
 from app.models.cache import redis_cache
+from app.models.post_process import PostPrecess
 from app.models.status import VideoDownloadStatus
 from app.models.types import DownloadTask
 from app.parsers.base import BaseParser
@@ -20,7 +21,6 @@ from app.utils.video_utils import (
     convert_to_mp3,
     download_hls_to_file,
     download_hls_av_to_file,
-    cut_media,
 )
 
 
@@ -381,20 +381,8 @@ class RutubeParser(BaseParser):
         else:
             task.filepath = temp_path
 
-        # Optional clipping
-        if download_video.start_seconds is not None or download_video.end_seconds is not None:
-            task.video_status.description = "Clipping selected fragment"
-            await redis_cache.set_download_task(task_id, task)
-            clipped_path = task.filepath.with_name(task.filepath.stem + "_clip" + task.filepath.suffix)
-            await asyncio.to_thread(
-                cut_media,
-                task.filepath.as_posix(),
-                clipped_path.as_posix(),
-                download_video.start_seconds,
-                download_video.end_seconds,
-            )
-            task.filepath.unlink(missing_ok=True)
-            task.filepath = clipped_path
+        post_process = PostPrecess(task, download_video)
+        await post_process.process()
 
         task.video_status.status = VideoDownloadStatus.COMPLETED
         task.video_status.description = VideoDownloadStatus.COMPLETED

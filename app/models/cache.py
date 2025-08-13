@@ -68,6 +68,7 @@ class RedisCache:
             return False
         return True
 
+    # TODO: убрать task_id, он есть в task
     async def set_download_task(self, task_id: str, task: DownloadTask) -> None:
         """Store download task in cache"""
         key = self._get_key(f"task:{task_id}")

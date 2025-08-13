@@ -112,7 +112,7 @@ def cut_media(input_path: str,
     if start_seconds is not None:
         cmd += ["-ss", str(start_seconds)]
     if end_seconds is not None:
-        cmd += ["-to", str(end_seconds)]
+        cmd += ["-to", str(end_seconds+1)]
     cmd += ["-i", input_path, "-c", "copy", "-y", output_path]
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -164,7 +164,6 @@ def download_hls_to_file(hls_url: str,
     )
 
     seconds_done = 0.0
-    percent = 0.0
     try:
         if process.stdout is not None:
             for line in process.stdout:

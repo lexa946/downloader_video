@@ -5,13 +5,14 @@ from typing import Optional
 
 from app.config import settings
 from app.models.cache import redis_cache
+from app.models.post_process import PostPrecess
 from app.models.status import VideoDownloadStatus
 from app.models.types import DownloadTask
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
 from app.utils.helpers import remove_all_spec_chars
 from app.utils.validators_utils import fallback_background_task
-from app.utils.video_utils import save_preview_on_s3, convert_to_mp3, cut_media
+from app.utils.video_utils import save_preview_on_s3, convert_to_mp3
 
 
 TIKTOK_HEADERS = {
@@ -165,20 +166,9 @@ class TikTokParser(BaseParser):
                 temp_path.unlink(missing_ok=True)
 
             task.filepath = out_path
-            # Optional clipping
-            if download_video.start_seconds is not None or download_video.end_seconds is not None:
-                task.video_status.description = "Clipping selected fragment"
-                await redis_cache.set_download_task(task_id, task)
-                clipped_path = task.filepath.with_name(task.filepath.stem + "_clip" + task.filepath.suffix)
-                await asyncio.to_thread(
-                    cut_media,
-                    task.filepath.as_posix(),
-                    clipped_path.as_posix(),
-                    download_video.start_seconds,
-                    download_video.end_seconds,
-                )
-                task.filepath.unlink(missing_ok=True)
-                task.filepath = clipped_path
+
+            post_process = PostPrecess(task, download_video)
+            await post_process.process()
 
             task.video_status.status = VideoDownloadStatus.COMPLETED
             task.video_status.description = VideoDownloadStatus.COMPLETED

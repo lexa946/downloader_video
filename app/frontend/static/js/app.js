@@ -33,6 +33,11 @@ const downloadReadyBtn = document.getElementById('downloadReadyBtn');
 
 // Clear input elements
 const clearInputBtn = document.getElementById('clearInput');
+const startTimeInput = document.getElementById('startTime');
+const endTimeInput = document.getElementById('endTime');
+const clipForm = document.getElementById('clipForm');
+const clearStartTimeBtn = document.getElementById('clearStartTime');
+const clearEndTimeBtn = document.getElementById('clearEndTime');
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
@@ -221,6 +226,136 @@ function formatDuration(seconds) {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
+function parseHmsToSeconds(val) {
+    if (val === undefined || val === null) return null;
+    const s = String(val).trim();
+    if (!s) return null;
+    const m = s.match(/^\d{2}:\d{2}:\d{2}$/);
+    if (!m) return null;
+    const [hh, mm, ss] = s.split(':').map(Number);
+    if (mm >= 60 || ss >= 60) return null;
+    return hh * 3600 + mm * 60 + ss;
+}
+
+function formatDigitsToHMS(digits) {
+    // Fill from right: SS, then MM, then HH
+    const raw = digits.replace(/[^0-9]/g, '').slice(-6); // keep last 6 digits
+    const pad = raw.padStart(6, '0');
+    const hh = pad.slice(0, 2);
+    let mm = pad.slice(2, 4);
+    let ss = pad.slice(4, 6);
+    // clamp to valid ranges to avoid invalid values during typing
+    if (Number(mm) > 59) mm = '59';
+    if (Number(ss) > 59) ss = '59';
+    return `${hh}:${mm}:${ss}`;
+}
+
+function attachHMSBehavior(input) {
+    if (!input) return;
+    // keep a separate buffer of digits per input
+    const ensureBuffer = () => {
+        if (typeof input.dataset.dbuf !== 'string') input.dataset.dbuf = '';
+    };
+    const renderFromBuffer = () => {
+        const formatted = formatDigitsToHMS(input.dataset.dbuf || '');
+        input.value = formatted;
+        try { input.setSelectionRange(formatted.length, formatted.length); } catch (_) {}
+    };
+    const initFromValue = () => {
+        const digits = (input.value || '').replace(/[^0-9]/g, '');
+        input.dataset.dbuf = digits.slice(-6);
+        renderFromBuffer();
+    };
+
+    ensureBuffer();
+    initFromValue();
+
+    input.addEventListener('keydown', (e) => {
+        ensureBuffer();
+        // allow navigation keys
+        const navKeys = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Tab','Home','End'];
+        if (navKeys.includes(e.key)) return;
+        if (e.key === 'Backspace') {
+            e.preventDefault();
+            // remove last digit (rightmost)
+            input.dataset.dbuf = (input.dataset.dbuf || '').slice(0, -1);
+            renderFromBuffer();
+            return;
+        }
+        if (e.key === 'Delete') {
+            e.preventDefault();
+            // behave same as backspace for simplicity
+            input.dataset.dbuf = (input.dataset.dbuf || '').slice(0, -1);
+            renderFromBuffer();
+            return;
+        }
+        if (/^[0-9]$/.test(e.key)) {
+            e.preventDefault();
+            const cur = (input.dataset.dbuf || '') + e.key;
+            // keep last 6 digits only
+            input.dataset.dbuf = cur.slice(-6);
+            renderFromBuffer();
+            return;
+        }
+        // block any other input
+        e.preventDefault();
+    });
+
+    input.addEventListener('input', () => {
+        // In case some browsers still emit input, normalize back to buffer rendering
+        renderFromBuffer();
+    });
+    input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData('text');
+        const digits = text.replace(/[^0-9]/g, '');
+        input.dataset.dbuf = digits.slice(-6);
+        renderFromBuffer();
+    });
+    input.addEventListener('keypress', (e) => {
+        // allow digits only; colon is managed by formatter
+        if (!/[0-9]/.test(e.key)) {
+            e.preventDefault();
+        }
+    });
+    input.addEventListener('blur', () => {
+        // if user left partially filled (like 12:3:), reformat/correct
+        renderFromBuffer();
+    });
+}
+
+attachHMSBehavior(startTimeInput);
+attachHMSBehavior(endTimeInput);
+
+// Toggle clip form visibility with slide effect via CSS class
+if (clipForm) {
+    // use details/open to drive state; animate via CSS if needed
+    const syncOpen = () => {
+        clipForm.dataset.open = clipForm.open ? 'true' : 'false';
+    };
+    clipForm.addEventListener('toggle', syncOpen);
+    syncOpen();
+}
+
+// Clear buttons for time inputs
+if (clearStartTimeBtn && startTimeInput) {
+    clearStartTimeBtn.addEventListener('click', () => {
+        // reset buffer and visual to 00:00:00
+        startTimeInput.dataset.dbuf = '';
+        startTimeInput.value = '00:00:00';
+        startTimeInput.focus();
+        try { startTimeInput.setSelectionRange(startTimeInput.value.length, startTimeInput.value.length); } catch(_) {}
+    });
+}
+if (clearEndTimeBtn && endTimeInput) {
+    clearEndTimeBtn.addEventListener('click', () => {
+        endTimeInput.dataset.dbuf = '';
+        endTimeInput.value = '00:00:00';
+        endTimeInput.focus();
+        try { endTimeInput.setSelectionRange(endTimeInput.value.length, endTimeInput.value.length); } catch(_) {}
+    });
+}
+
 function setButtonLoading(button, isLoading) {
     if (!button) return;
     
@@ -371,12 +506,48 @@ async function startDownload(videoFormatId, audioFormatId) {
         showError('Данные о видео не найдены. Попробуйте заново получить форматы.');
         return;
     }
-    
+    const clipEnabled = clipForm && clipForm.dataset.open === 'true';
+    const rawStart = startTimeInput ? startTimeInput.value.trim() : '';
+    const rawEnd = endTimeInput ? endTimeInput.value.trim() : '';
+    const start_seconds = clipEnabled && rawStart ? parseHmsToSeconds(rawStart) : null;
+    const end_seconds = clipEnabled && rawEnd ? parseHmsToSeconds(rawEnd) : null;
+
+    if (clipEnabled) {
+        if (rawStart && start_seconds == null) {
+            showError('Неверный формат начала. Используйте ЧЧ:ММ:СС');
+            return;
+        }
+        if (rawEnd && end_seconds == null) {
+            showError('Неверный формат конца. Используйте ЧЧ:ММ:СС');
+            return;
+        }
+        if (start_seconds != null && end_seconds != null && end_seconds <= start_seconds) {
+            showError('Конец должен быть позже начала');
+            return;
+        }
+
+        const duration = currentVideoData && typeof currentVideoData.duration === 'number' ? currentVideoData.duration : null;
+        if (duration != null) {
+            if (start_seconds != null && start_seconds > duration) {
+                showError('Начало выходит за пределы длительности видео');
+                return;
+            }
+            if (end_seconds != null && end_seconds > duration) {
+                showError('Конец выходит за пределы длительности видео');
+                return;
+            }
+        }
+    }
+
     const downloadData = {
         url: currentVideoData.url,
         video_format_id: videoFormatId,
-        audio_format_id: audioFormatId
+        audio_format_id: audioFormatId,
+        start_seconds: start_seconds,
+        end_seconds: end_seconds
     };
+    if (downloadData.start_seconds == null) delete downloadData.start_seconds;
+    if (downloadData.end_seconds == null) delete downloadData.end_seconds;
     
     try {
         const response = await fetch('/api/start-download', {

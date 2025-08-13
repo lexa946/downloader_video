@@ -97,6 +97,26 @@ def convert_to_mp3(input_path: str, output_path: str):
     ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def cut_media(input_path: str,
+              output_path: str,
+              start_seconds: Optional[int] = None,
+              end_seconds: Optional[int] = None):
+    """
+    Безперекодировочная обрезка файла по времени.
+
+    Если задан только start_seconds — отрезает от start до конца.
+    Если задан только end_seconds — отрезает от начала до end.
+    Если заданы оба — отрезает интервал [start, end).
+    """
+    cmd = [FFMPEG]
+    if start_seconds is not None:
+        cmd += ["-ss", str(start_seconds)]
+    if end_seconds is not None:
+        cmd += ["-to", str(end_seconds)]
+    cmd += ["-i", input_path, "-c", "copy", "-y", output_path]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def _build_ffmpeg_headers_arg(headers: Optional[Dict[str, str]]) -> list[str]:
     if not headers:
         return []

@@ -14,6 +14,7 @@ from app.models.types import DownloadTask
 
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
+from app.utils.validators_utils import fallback_background_task
 from app.utils.video_utils import save_preview_on_s3, convert_to_mp3, cut_media
 
 
@@ -68,6 +69,7 @@ class InstagramParser(BaseParser):
         self.url = url
         self._response_text = None
 
+    @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
         async with aiohttp.ClientSession() as session:

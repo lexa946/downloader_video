@@ -10,6 +10,7 @@ from app.models.status import VideoDownloadStatus
 from app.models.types import DownloadTask
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoFormat, SVideoResponse, SVideoDownload
+from app.utils.validators_utils import fallback_background_task
 from app.utils.video_utils import save_preview_on_s3, combine_audio_and_video, convert_to_mp3, cut_media
 
 
@@ -19,11 +20,11 @@ class YouTubeParser(BaseParser):
         self.url = url
         self._yt = YouTube(self.url)
 
+    @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
 
         download_path = Path(settings.DOWNLOAD_FOLDER) / self._yt.author
-
         event_loop = asyncio.get_event_loop()
 
         def post_process_hook(stream_: Stream, chunk: bytes, bytes_remaining: int):
@@ -31,8 +32,6 @@ class YouTubeParser(BaseParser):
             percent = round(100.0 * bytes_received / float(stream_.filesize), 1)
             task.video_status.percent = float(percent)
             event_loop.create_task(redis_cache.set_download_task(task_id, task))
-
-
 
         self._yt.register_on_progress_callback(post_process_hook)
         try:

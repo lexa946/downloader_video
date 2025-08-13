@@ -242,7 +242,6 @@ def download_hls_av_to_file(video_hls_url: str,
     )
 
     seconds_done = 0.0
-    percent = 0.0
     try:
         if process.stdout is not None:
             for line in process.stdout:

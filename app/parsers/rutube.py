@@ -14,6 +14,7 @@ from app.models.types import DownloadTask
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
 from app.utils.helpers import remove_all_spec_chars
+from app.utils.validators_utils import fallback_background_task
 from app.utils.video_utils import (
     save_preview_on_s3,
     convert_to_mp3,
@@ -290,6 +291,7 @@ class RutubeParser(BaseParser):
             formats=available_formats,
         )
 
+    @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
         video = await self._fetch_rutube_video()

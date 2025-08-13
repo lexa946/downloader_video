@@ -6,6 +6,22 @@ from fastapi import HTTPException
 from starlette import status
 
 from app.models.cache import redis_cache
+from app.models.status import VideoDownloadStatus
+from app.models.types import DownloadTask
+from app.schemas.main import SVideoDownload
+
+
+def fallback_background_task(func):
+    @wraps(func)
+    async def wrapper(self, task_id: str, download_video: SVideoDownload):
+        task: DownloadTask = await redis_cache.get_download_task(task_id)
+        try:
+            await func(self, task_id, download_video)
+        except Exception as e:
+            task.video_status.status = VideoDownloadStatus.ERROR
+            task.video_status.description = str(e)
+            await redis_cache.set_download_task(task_id, task)
+    return wrapper
 
 
 def check_task_id(func):

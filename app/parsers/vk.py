@@ -127,15 +127,15 @@ class VkParser(BaseParser):
 
     async def _get_video_info(self, session: aiohttp.ClientSession) -> dict:
         try:
-            if "vkvideo" in self.url:
-                data = {
-                    "al": 1,
-                    "is_video_page": True,
-                    "video": f"-{self.owner_id}_{self.video_id}",
-                }
-                async with session.post(self.VIDEO_INFO_URL, data=data, ssl=self._ssl_context) as response:
-                    response.raise_for_status()
-                    response_json = await response.json()
+            data = {
+                "al": 1,
+                "is_video_page": True,
+                "video": f"-{self.owner_id}_{self.video_id}",
+            }
+            async with session.post(self.VIDEO_INFO_URL, data=data, ssl=self._ssl_context) as response:
+                response.raise_for_status()
+                response_json = await response.json()
+            if response_json['payload'][1][1]:
                 return response_json
             else:
                 embed_url = f"https://vk.com/video_ext.php?oid={self.owner_id}&id={self.video_id}"

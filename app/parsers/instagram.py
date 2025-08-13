@@ -129,11 +129,48 @@ class InstagramParser(BaseParser):
     @staticmethod
     def _parse_video_attributes(content: str) -> InstagramVideo:
         soup = BeautifulSoup(content, features="lxml")
-        json_tag = list(
-            filter(lambda json_tag: ".mp4" in json_tag.text, soup.select("script[type='application/json']"))
-        )[0]
-        json_ = json.loads(json_tag.text)
-        return InstagramVideo.from_json(json_)
+
+        # Try to use canonical/og:url to extract current shortcode for disambiguation
+        canonical_tag = soup.select_one("link[rel='canonical']")
+        if canonical_tag and canonical_tag.get("href"):
+            canonical_url = canonical_tag.get("href", "")
+        else:
+            og_url_tag = soup.select_one("meta[property='og:url']")
+            canonical_url = og_url_tag.get("content", "") if og_url_tag and og_url_tag.get("content") else ""
+
+        shortcode = None
+        if canonical_url:
+            parts = [p for p in canonical_url.split('/') if p]
+            for i, p in enumerate(parts):
+                if p in ("reel", "reels", "p"):
+                    if i + 1 < len(parts):
+                        shortcode = parts[i + 1]
+                    break
+
+        # Prefer the JSON blob that contains the shortcode web info and matches the shortcode if available
+        scripts = soup.select("script[type='application/json']")
+        selected = None
+        for tag in scripts:
+            txt = tag.text
+            if '"xdt_api__v1__media__shortcode__web_info"' in txt:
+                if shortcode and shortcode in txt:
+                    selected = tag
+                    break
+                if selected is None:
+                    selected = tag
+
+        if selected is None:
+            # Fallback to previous heuristic
+            selected = next((t for t in scripts if ".mp4" in t.text), None)
+        if selected is None:
+            raise ValueError("Unable to find media info JSON")
+
+        json_ = json.loads(selected.text)
+        video = InstagramVideo.from_json(json_)
+        # Make title unique to avoid collisions (also fixes preview key uniqueness)
+        if shortcode:
+            video.title = f"video_by_{video.author}_{shortcode}.mp4"
+        return video
 
     async def get_formats(self) -> SVideoResponse:
         async with aiohttp.ClientSession() as session:

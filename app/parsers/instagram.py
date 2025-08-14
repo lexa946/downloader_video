@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from bs4 import BeautifulSoup
 
 from app.config import settings
+from app.exceptions import DownloadUserCanceledException
 from app.models.cache import redis_cache
 from app.models.post_process import PostPrecess
 from app.models.status import VideoDownloadStatus
@@ -83,9 +84,6 @@ class InstagramParser(BaseParser):
             download_path.parent.mkdir(parents=True, exist_ok=True)
 
             is_audio_only = not download_video.video_format_id
-
-            task.video_status.description = "Downloading video track" if not is_audio_only else "Downloading audio track"
-            await redis_cache.set_download_task(task_id, task)
             async with session.get(video.content_url, headers=self.headers, cookies=self.cookies) as response:
                 response.raise_for_status()
 
@@ -96,6 +94,10 @@ class InstagramParser(BaseParser):
                 if is_audio_only:
                     temp_path = download_path.with_suffix('.temp')
 
+                task.filepath = temp_path
+                task.video_status.description = "Downloading video track" if not is_audio_only else "Downloading audio track"
+                await redis_cache.set_download_task(task_id, task)
+
                 async with aiofiles.open(temp_path, 'wb') as f:
                     while True:
                         chunk = await response.content.read(8192)  # читаем по 8 КБ
@@ -105,6 +107,8 @@ class InstagramParser(BaseParser):
                         bytes_read += len(chunk)
                         task.video_status.percent = int((bytes_read / total_size) * 100)
                         await redis_cache.set_download_task(task_id, task)
+                        if await redis_cache.is_task_canceled(task_id):
+                            raise DownloadUserCanceledException()
 
                 if is_audio_only:
                     task.video_status.description = "Converting to MP3"

@@ -1131,7 +1131,8 @@ function getStatusInfo(status) {
         'downloading': { icon: '⬇️', text: 'Скачивается' },
         'pending': { icon: '⏳', text: 'Ожидание' },
         'processing': { icon: '⚙️', text: 'Обработка' },
-        'error': { icon: '❌', text: 'Ошибка' }
+        'error': { icon: '❌', text: 'Ошибка' },
+        'canceled': { icon: '❌', text: 'Отменено' }
     };
     
     return statusMap[status] || { icon: '❓', text: 'Неизвестно' };
@@ -1150,7 +1151,7 @@ function createHistoryActions(videoStatus) {
         `;
     }
     
-    if (status === 'error' || status === 'done') {
+    if (status === 'error' || status === 'done' || status === 'canceled') {
         actions += `
             <button class="history-btn redownload" onclick="redownloadVideo('${videoStatus.video.url}')">
                 <span>🔄</span> Заново

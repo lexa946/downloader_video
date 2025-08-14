@@ -11,6 +11,7 @@ import aiohttp
 from Crypto.Util.py3compat import BytesIO
 
 from app.config import settings
+from app.exceptions import DownloadUserCanceledException
 from app.models.cache import redis_cache
 from app.models.status import VideoDownloadStatus
 from app.models.types import DownloadTask
@@ -132,7 +133,9 @@ def download_hls_to_file(hls_url: str,
                          output_path: str,
                          duration_seconds: int,
                          on_progress: Optional[Callable[[float, float], None]] = None,
-                         headers: Optional[Dict[str, str]] = None) -> None:
+                         headers: Optional[Dict[str, str]] = None,
+                         check_cancel = None,
+                         ) -> None:
     """
     Загрузка HLS-потока через ffmpeg с прогрессом.
 
@@ -170,6 +173,10 @@ def download_hls_to_file(hls_url: str,
                 line = line.strip()
                 # ffmpeg -progress outputs key=value lines
                 # we look for out_time_ms
+                if check_cancel and check_cancel():
+                    process.terminate()
+                    raise DownloadUserCanceledException()
+
                 if line.startswith("out_time_ms="):
                     try:
                         out_time_ms = float(line.split("=", 1)[1])
@@ -209,7 +216,8 @@ def download_hls_av_to_file(video_hls_url: str,
                             output_path: str,
                             duration_seconds: int,
                             on_progress: Optional[Callable[[float, float], None]] = None,
-                            headers: Optional[Dict[str, str]] = None) -> None:
+                            headers: Optional[Dict[str, str]] = None,
+                            check_cancel =  None) -> None:
     """
     Загрузка раздельных HLS дорожек (видео + аудио) и муксинг в один MP4.
     """
@@ -245,6 +253,9 @@ def download_hls_av_to_file(video_hls_url: str,
         if process.stdout is not None:
             for line in process.stdout:
                 line = line.strip()
+                if check_cancel and check_cancel():
+                    process.terminate()
+                    raise DownloadUserCanceledException()
                 if line.startswith("out_time_ms="):
                     try:
                         out_time_ms = float(line.split("=", 1)[1])

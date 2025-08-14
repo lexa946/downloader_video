@@ -1,8 +1,4 @@
-import re
 import asyncio
-import aiohttp
-import json as _json
-
 from datetime import timedelta
 from pathlib import Path
 from urllib.parse import quote_plus
@@ -12,6 +8,7 @@ from pytubefix import Stream, YouTube, StreamQuery, Search
 from bs4 import BeautifulSoup
 
 from app.config import settings
+from app.exceptions import DownloadUserCanceledException
 from app.models.cache import redis_cache
 from app.models.post_process import PostPrecess
 from app.models.status import VideoDownloadStatus
@@ -20,6 +17,8 @@ from app.parsers.base import BaseParser
 from app.schemas.main import SVideoFormat, SVideoResponse, SVideoDownload, SYoutubeSearchItem
 from app.utils.validators_utils import fallback_background_task
 from app.utils.video_utils import save_preview_on_s3, combine_audio_and_video, convert_to_mp3
+
+
 
 class YouTubeParser(BaseParser):
 
@@ -180,7 +179,11 @@ class YouTubeParser(BaseParser):
             bytes_received = stream_.filesize - bytes_remaining
             percent = round(100.0 * bytes_received / float(stream_.filesize), 1)
             task.video_status.percent = float(percent)
-            event_loop.create_task(redis_cache.set_download_task(task_id, task))
+            async def _update_and_check():
+                await redis_cache.set_download_task(task_id, task)
+                if await redis_cache.is_task_canceled(task_id):
+                    raise DownloadUserCanceledException()
+            event_loop.create_task(_update_and_check())
 
         self._yt.register_on_progress_callback(post_process_hook)
         try:
@@ -192,8 +195,7 @@ class YouTubeParser(BaseParser):
                     output_path=download_path.as_posix(),
                     filename_prefix=f"{task_id}_audio_"
                 ))
-                
-                # Конвертируем в MP3
+
                 task.video_status.description = "Converting to MP3"
                 await redis_cache.set_download_task(task_id, task)
                 out_path = audio_path.with_suffix('.mp3')

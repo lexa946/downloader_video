@@ -3,3 +3,4 @@ class VideoDownloadStatus:
     PENDING = "pending"
     COMPLETED = "completed"
     DONE = "done"
+    CANCELED = "canceled"

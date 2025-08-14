@@ -126,7 +126,7 @@ async def on_startup():
                     await redis_cache.set_download_task(task_id, task)
                     if user_id:
                         await redis_cache.release_user_active_task(user_id, task_id)
-            elif status in (VideoDownloadStatus.COMPLETED, VideoDownloadStatus.DONE, VideoDownloadStatus.ERROR):
+            elif status in (VideoDownloadStatus.COMPLETED, VideoDownloadStatus.DONE, VideoDownloadStatus.ERROR, getattr(VideoDownloadStatus, 'CANCELED', 'canceled')):
                 # Ensure any lingering lock is released
                 if user_id:
                     await redis_cache.release_user_active_task(user_id, task_id)

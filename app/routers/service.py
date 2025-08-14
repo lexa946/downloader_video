@@ -174,7 +174,7 @@ async def download_events(request: Request, task_id: Annotated[str, Path()]):
                 # Останавливаемся при завершении
                 try:
                     payload = json.loads(data)
-                    if payload.get("status") in ("completed", "error", "done"):
+                    if payload.get("status") in ("completed", "error", "done", "canceled"):
                         break
                 except Exception:
                     pass
@@ -190,6 +190,28 @@ async def download_events(request: Request, task_id: Annotated[str, Path()]):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
+
+
+@router.post("/cancel/{task_id}")
+@check_task_id
+async def cancel_download(task_id: Annotated[str, Path()]):
+    """Отменяет активную загрузку."""
+    task: DownloadTask = await redis_cache.get_download_task(task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    # Mark as canceled and persist. Parsers should observe cancel flag and stop.
+    task.video_status.status = VideoDownloadStatus.CANCELED
+    task.video_status.description = "Canceled by user"
+    await redis_cache.set_download_task(task_id, task)
+    await redis_cache.set_task_canceled(task_id)
+
+    # Try to release active lock (if any)
+    user_id = await redis_cache.get_task_user(task_id)
+    if user_id:
+        await redis_cache.release_user_active_task(user_id, task_id)
+
+    return {"ok": True}
 
 @router.get("/get-video/{task_id}")
 @check_task_id

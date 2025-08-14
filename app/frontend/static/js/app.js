@@ -17,6 +17,7 @@ const videoThumbnail = document.getElementById('videoThumbnail');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
 const statusText = document.getElementById('statusText');
+const cancelBtn = document.getElementById('cancelBtn');
 
 // YouTube search elements
 const ytSearchQuery = document.getElementById('ytSearchQuery');
@@ -127,6 +128,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 downloadCompletedFile();
             }
         });
+    }
+    // Кнопка отмены
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', cancelCurrentTask);
     }
     
     // Обработчик кнопки очистки поля
@@ -716,6 +721,10 @@ function startProgressTracking() {
     } else {
         startPollingFallback();
     }
+    if (cancelBtn) {
+        cancelBtn.disabled = false;
+        cancelBtn.style.display = 'inline-block';
+    }
 }
 
 function startSSE() {
@@ -737,6 +746,17 @@ function startSSE() {
                 }
                 loadUserHistory();
                 hideProgress();
+                if (cancelBtn) cancelBtn.style.display = 'none';
+            } else if (statusData.status === 'canceled') {
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+                showError('Загрузка отменена');
+                hideProgress();
+                showResults();
+                if (cancelBtn) cancelBtn.style.display = 'none';
+                loadUserHistory();
             } else if (statusData.status === 'error') {
                 if (eventSource) {
                     eventSource.close();
@@ -745,6 +765,7 @@ function startSSE() {
                 showError(statusData.description || 'Произошла ошибка при скачивании');
                 hideProgress();
                 showResults();
+                if (cancelBtn) cancelBtn.style.display = 'none';
             }
         } catch (err) {
             console.error('SSE parse error:', err);
@@ -788,6 +809,13 @@ async function checkDownloadProgress() {
             }
             await loadUserHistory();
             hideProgress();
+        } else if (statusData.status === 'canceled') {
+            clearInterval(progressInterval);
+            progressInterval = null;
+            showError('Загрузка отменена');
+            hideProgress();
+            showResults();
+            await loadUserHistory();
         } else if (statusData.status === 'error') {
             clearInterval(progressInterval);
             progressInterval = null;
@@ -814,13 +842,38 @@ function updateProgressDisplay(statusData) {
         'downloading': 'Скачивание видео...',
         'processing': 'Обработка файла...',
         'completed': 'Скачивание завершено!',
-        'error': 'Произошла ошибка'
+        'error': 'Произошла ошибка',
+        'canceled': 'Отменено пользователем'
     };
     
     if (statusText) {
         statusText.textContent = statusData.description || 
                                 statusMessages[statusData.status] || 
                                 'Выполняется...';
+    }
+}
+
+async function cancelCurrentTask() {
+    if (!currentTaskId) return;
+    try {
+        const response = await fetch(`/api/cancel/${currentTaskId}`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || 'Не удалось отменить загрузку');
+        }
+        showSuccess('Отменяем загрузку...');
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+        hideProgress();
+        showResults();
+        if (cancelBtn) cancelBtn.style.display = 'none';
+        await loadUserHistory();
+    } catch (e) {
+        showError(e.message || 'Ошибка при отмене');
     }
 }
 
@@ -1078,7 +1131,8 @@ function getStatusInfo(status) {
         'downloading': { icon: '⬇️', text: 'Скачивается' },
         'pending': { icon: '⏳', text: 'Ожидание' },
         'processing': { icon: '⚙️', text: 'Обработка' },
-        'error': { icon: '❌', text: 'Ошибка' }
+        'error': { icon: '❌', text: 'Ошибка' },
+        'canceled': { icon: '❌', text: 'Отменено' }
     };
     
     return statusMap[status] || { icon: '❓', text: 'Неизвестно' };
@@ -1097,7 +1151,7 @@ function createHistoryActions(videoStatus) {
         `;
     }
     
-    if (status === 'error' || status === 'done') {
+    if (status === 'error' || status === 'done' || status === 'canceled') {
         actions += `
             <button class="history-btn redownload" onclick="redownloadVideo('${videoStatus.video.url}')">
                 <span>🔄</span> Заново
@@ -1112,8 +1166,35 @@ function createHistoryActions(videoStatus) {
             </button>
         `;
     }
+    if (status === 'pending' || status === 'downloading' || status === 'processing') {
+        actions += `
+            <button class="history-btn danger" onclick="cancelHistoryTask('${videoStatus.task_id}')">
+                <span>🛑</span> Отменить
+            </button>
+        `;
+    }
     
     return actions;
+}
+
+async function cancelHistoryTask(taskId) {
+    try {
+        const response = await fetch(`/api/cancel/${taskId}`, { method: 'POST' });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || 'Не удалось отменить задачу');
+        }
+        showSuccess('Загрузка отменена');
+        await loadUserHistory();
+        if (currentTaskId === taskId) {
+            if (eventSource) { eventSource.close(); eventSource = null; }
+            hideProgress();
+            showResults();
+            if (cancelBtn) cancelBtn.style.display = 'none';
+        }
+    } catch (e) {
+        showError(e.message || 'Ошибка при отмене');
+    }
 }
 
 async function downloadHistoryFile(taskId) {

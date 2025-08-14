@@ -21,79 +21,79 @@
         {% endblock %}
 
         <section class="download-section">
-            <div class="url-input-container">
-                <div class="input-wrapper">
-                    <input
-                            type="url"
-                            id="videoUrl"
-                            placeholder="Вставьте ссылку на видео (YouTube, Instagram*, VK, RuTube, TikTok)"
-                            class="url-input"
-                            aria-label="Ссылка на видео для скачивания"
-                    >
-                    <button id="clearInput" class="clear-input-btn" title="Очистить поле">
-                        ✕
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="analyze">Получить форматы</button>
+                <button class="tab-btn" data-tab="search">Поиск</button>
+            </div>
+
+            <!-- Вкладка Поиск -->
+            <div id="searchTab" class="platforms" style="margin-top:8px; display:none;">
+                <div class="url-input-container">
+                    <div class="input-wrapper">
+                        <input type="text" id="ytSearchQuery"
+                               placeholder="Найдите нужное видео на YouTube по запросу. Например: смешные коты 2024"
+                               class="url-input" aria-label="Поисковый запрос по YouTube">
+                        <button id="clearSearch" class="clear-input-btn" title="Очистить">✕</button>
+                    </div>
+                    <button id="searchBtn" class="analyze-btn" aria-label="Искать видео">
+                        <span class="btn-text">Поиск</span>
+                        <span class="btn-loader" style="display:none;">⏳</span>
                     </button>
                 </div>
-                <button id="analyzeBtn" class="analyze-btn" aria-label="Анализировать видео">
-                    <span class="btn-text">Получить форматы</span>
-                    <span class="btn-loader" style="display: none;">⏳</span>
-                </button>
+                <div id="ytSearchResults" class="formats-list" style="margin-top:12px;"></div>
             </div>
 
-            <div class="clip-controls" style="flex-basis:100%; width:100%;">
-                <details id="clipForm" class="clip-form" style="margin-top:8px;">
-                    <summary class="clip-summary">Пост-обработка видео</summary>
-                    <div class="clip-row" style="display:flex; gap:12px; flex-wrap:nowrap; align-items:flex-end; margin-top:8px;">
-                        <label class="time-field" style="display:flex; flex-direction:column; gap:6px;">
-                            <span class="time-label" style="font-size:0.9rem; color:#7f8c8d;">Начало фрагмента</span>
-                            <div class="input-wrapper time-wrapper" style="flex:0 0 auto;">
-                                <input type="text" id="startTime" inputmode="numeric" maxlength="8" pattern="^\\d{2}:\\d{2}:\\d{2}$" placeholder="ЧЧ:ММ:СС" class="url-input time-input" aria-label="Время начала в формате ЧЧ:ММ:СС">
-                                <button id="clearStartTime" class="clear-input-btn" title="Очистить время">✕</button>
-                            </div>
-                        </label>
-                        <label class="time-field" style="display:flex; flex-direction:column; gap:6px;">
-                            <span class="time-label" style="font-size:0.9rem; color:#7f8c8d;">Конец фрагмента</span>
-                            <div class="input-wrapper time-wrapper" style="flex:0 0 auto;">
-                                <input type="text" id="endTime" inputmode="numeric" maxlength="8" pattern="^\\d{2}:\\d{2}:\\d{2}$" placeholder="ЧЧ:ММ:СС" class="url-input time-input" aria-label="Время конца в формате ЧЧ:ММ:СС">
-                                <button id="clearEndTime" class="clear-input-btn" title="Очистить время">✕</button>
-                            </div>
-                        </label>
+            <div id="analyzeTab">
+                <div class="url-input-container">
+                    <div class="input-wrapper">
+                        <input
+                                type="url"
+                                id="videoUrl"
+                                placeholder="Вставьте ссылку на видео (YouTube, Instagram*, VK, RuTube, TikTok)"
+                                class="url-input"
+                                aria-label="Ссылка на видео для скачивания"
+                        >
+                        <button id="clearInput" class="clear-input-btn" title="Очистить поле">
+                            ✕
+                        </button>
                     </div>
-                </details>
-            </div>
-
-            {% block platforms %}
-                <!-- Поддерживаемые платформы -->
-                <div class="platforms">
-                    <p>Поддерживаемые платформы:</p>
-                    <div class="platform-icons">
-                        <div class="platform-item">
-                            <span class="platform-icon">🎥</span>
-                            <span>YouTube</span>
-                        </div>
-                        <div class="platform-item">
-                            <span class="platform-icon">📸</span>
-                            <span>Instagram*</span>
-                        </div>
-                        <div class="platform-item">
-                            <span class="platform-icon">👥</span>
-                            <span>VKontakte</span>
-                        </div>
-                        <div class="platform-item">
-                            <span class="platform-icon">🎬</span>
-                            <span>VK Video</span>
-                        </div>
-                        <div class="platform-item">
-                            <span class="platform-icon">📺</span>
-                            <span>RuTube</span>
-                        </div>
-                         <div class="platform-item">
-                             <span class="platform-icon">🎵</span>
-                             <span>TikTok</span>
-                         </div>
-                    </div>
+                    <button id="analyzeBtn" class="analyze-btn" aria-label="Анализировать видео">
+                        <span class="btn-text">Получить форматы</span>
+                        <span class="btn-loader" style="display: none;">⏳</span>
+                    </button>
                 </div>
-            {% endblock %}
+
+                <div class="clip-controls" style="flex-basis:100%; width:100%;">
+                    <details id="clipForm" class="clip-form" style="margin-top:8px;">
+                        <summary class="clip-summary">Пост-обработка видео</summary>
+                        <div class="clip-row"
+                             style="display:flex; gap:12px; flex-wrap:nowrap; align-items:flex-end; margin-top:8px;">
+                            <label class="time-field" style="display:flex; flex-direction:column; gap:6px;">
+                                <span class="time-label"
+                                      style="font-size:0.9rem; color:#7f8c8d;">Начало фрагмента</span>
+                                <div class="input-wrapper time-wrapper" style="flex:0 0 auto;">
+                                    <input type="text" id="startTime" inputmode="numeric" maxlength="8"
+                                           pattern="^\\d{2}:\\d{2}:\\d{2}$" placeholder="ЧЧ:ММ:СС"
+                                           class="url-input time-input" aria-label="Время начала в формате ЧЧ:ММ:СС">
+                                    <button id="clearStartTime" class="clear-input-btn" title="Очистить время">✕
+                                    </button>
+                                </div>
+                            </label>
+                            <label class="time-field" style="display:flex; flex-direction:column; gap:6px;">
+                                <span class="time-label" style="font-size:0.9rem; color:#7f8c8d;">Конец фрагмента</span>
+                                <div class="input-wrapper time-wrapper" style="flex:0 0 auto;">
+                                    <input type="text" id="endTime" inputmode="numeric" maxlength="8"
+                                           pattern="^\\d{2}:\\d{2}:\\d{2}$" placeholder="ЧЧ:ММ:СС"
+                                           class="url-input time-input" aria-label="Время конца в формате ЧЧ:ММ:СС">
+                                    <button id="clearEndTime" class="clear-input-btn" title="Очистить время">✕</button>
+                                </div>
+                            </label>
+                        </div>
+                    </details>
+                </div>
+            </div>
+
 
         </section>
         <!-- Кнопка для скачивания готового файла -->
@@ -230,10 +230,10 @@
                     <h3>📺 <a href="/rutube-downloader">RuTube Downloader</a></h3>
                     <p><strong>Скачать видео с RuTube</strong> быстро и удобно. Поддержка MP4 и MP3.</p>
                 </div>
-                 <div class="info-card">
-                     <h3>🎵 <a href="/tiktok-downloader">TikTok Downloader</a></h3>
-                     <p><strong>Скачать видео из TikTok</strong> с музыкой или только аудио.</p>
-                 </div>
+                <div class="info-card">
+                    <h3>🎵 <a href="/tiktok-downloader">TikTok Downloader</a></h3>
+                    <p><strong>Скачать видео из TikTok</strong> с музыкой или только аудио.</p>
+                </div>
             </div>
         </section>
     </main>

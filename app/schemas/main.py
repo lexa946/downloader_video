@@ -39,3 +39,16 @@ class SVideoStatus(BaseModel):
     percent: float = field(default=0)
     video: SVideoResponse
 
+
+# ---- YouTube Search Schemas ----
+class SYoutubeSearchItem(BaseModel):
+    video_url: str
+    title: str
+    author: Optional[str] = field(default=None)
+    duration: Optional[int] = field(default=None)
+    thumbnail_url: Optional[str] = field(default=None)
+
+
+class SYoutubeSearchResponse(BaseModel):
+    items: list[SYoutubeSearchItem]
+

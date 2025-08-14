@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 from logging import getLogger
@@ -16,8 +17,16 @@ from app.models.status import VideoDownloadStatus
 
 from app.models.cache import redis_cache
 from app.models.types import DownloadTask
+from app.parsers import YouTubeParser
 from app.schemas.defaults import EMPTY_VIDEO_RESPONSE
-from app.schemas.main import SVideoResponse, SVideoRequest, SVideoDownload, SVideoStatus
+from app.schemas.main import (
+    SVideoResponse,
+    SVideoRequest,
+    SVideoDownload,
+    SVideoStatus,
+    SYoutubeSearchResponse,
+)
+from app.utils.video_utils import save_preview_on_s3
 from app.utils.validators_utils import check_task_id
 from app.utils.video_utils import stream_file
 
@@ -215,3 +224,13 @@ async def get_downloaded_video(task_id: Annotated[str, Path()]):
         media_type="application/octet-stream",
         headers=headers
     )
+
+
+@router.get("/youtube/search", response_model=SYoutubeSearchResponse)
+async def youtube_search(q: str):
+    """Поиск по YouTube (первая страница).
+
+    Скрейпит результаты выдачи поискового запроса и возвращает карточки.
+    """
+    result_items = await YouTubeParser.search_videos(q)
+    return SYoutubeSearchResponse(items=result_items)

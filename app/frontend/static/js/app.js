@@ -509,7 +509,7 @@ function renderYoutubeSearchResults(items) {
         const div = document.createElement('div');
         div.className = 'format-item yt-result';
         const thumb = item.thumbnail_url ? `<img loading="lazy" src="${item.thumbnail_url}" alt="Preview" class="yt-thumb" onerror="this.style.display='none'">` : '';
-        const duration = item.duration_text ? `<div class="yt-duration">${item.duration_text}</div>` : '';
+        const duration = item.duration ? `<div class="yt-duration">${formatDuration(item.duration)}</div>` : '';
         const author = item.author ? `<div class="yt-author">${item.author}</div>` : '';
         div.innerHTML = `
             ${thumb}

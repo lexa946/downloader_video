@@ -85,29 +85,7 @@
     </section>
 {% endblock %}
 
-{% block tabs %}
-    <div class="tabs">
-        <button class="tab-btn active" data-tab="analyze">Получить форматы</button>
-        <button class="tab-btn" data-tab="search">Поиск</button>
-    </div>
-{% endblock %}
-{% block search_tab %}
-    <!-- Вкладка Поиск -->
-    <div id="searchTab" class="platforms" style="margin-top:8px; display:none;">
-        <p>Найдите нужное видео на YouTube по запросу:</p>
-        <div class="url-input-container">
-            <div class="input-wrapper">
-                <input type="text" id="ytSearchQuery" placeholder="Например: смешные коты 2024" class="url-input" aria-label="Поисковый запрос по YouTube">
-                <button id="clearSearch" class="clear-input-btn" title="Очистить">✕</button>
-            </div>
-            <button id="searchBtn" class="analyze-btn" aria-label="Искать видео">
-                <span class="btn-text">Поиск</span>
-                <span class="btn-loader" style="display:none;">⏳</span>
-            </button>
-        </div>
-        <div id="ytSearchResults" class="formats-list" style="margin-top:12px;"></div>
-    </div>
-{% endblock %}
+
 {% block platforms %}
     <!-- YouTube специфичная информация -->
     <div class="platforms">

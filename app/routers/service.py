@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 from logging import getLogger
@@ -16,6 +17,7 @@ from app.models.status import VideoDownloadStatus
 
 from app.models.cache import redis_cache
 from app.models.types import DownloadTask
+from app.parsers import YouTubeParser
 from app.schemas.defaults import EMPTY_VIDEO_RESPONSE
 from app.schemas.main import (
     SVideoResponse,
@@ -230,151 +232,5 @@ async def youtube_search(q: str):
 
     Скрейпит результаты выдачи поискового запроса и возвращает карточки.
     """
-    try:
-        # Lazy import to avoid heavy deps at startup paths
-        import aiohttp
-        import re
-        import json as _json
-        from bs4 import BeautifulSoup
-        from urllib.parse import quote_plus
-        import asyncio
-
-        # Query url
-        search_url = f"https://www.youtube.com/results?search_query={quote_plus(q)}"
-
-        async with aiohttp.ClientSession(headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "ru,en;q=0.9",
-        }) as session:
-            async with session.get(search_url) as resp:
-                resp.raise_for_status()
-                html = await resp.text()
-
-        # Try to parse initial data structure
-        yt_initial_json = None
-        m = re.search(r"ytInitialData\s*=\s*(\{[\s\S]*?\});", html)
-        if m:
-            try:
-                yt_initial_json = _json.loads(m.group(1))
-            except Exception:
-                yt_initial_json = None
-
-        items: list[dict] = []
-        if yt_initial_json:
-            # Walk through contents to find videoRenderer entries
-            def walk(obj):
-                if isinstance(obj, dict):
-                    if "videoRenderer" in obj:
-                        items.append(obj["videoRenderer"])
-                    for v in obj.values():
-                        walk(v)
-                elif isinstance(obj, list):
-                    for v in obj:
-                        walk(v)
-            walk(yt_initial_json)
-        else:
-            # Fallback: parse anchors via BeautifulSoup
-            soup = BeautifulSoup(html, "lxml")
-            for a in soup.select("a#video-title[href^='/watch']"):
-                items.append({
-                    "navigationEndpoint": {"commandMetadata": {"webCommandMetadata": {"url": a.get("href")}}},
-                    "title": {"runs": [{"text": a.get("title") or a.get_text(strip=True)}]},
-                })
-
-        # Convert to response items (trim to first page reasonable amount)
-        from app.schemas.main import SYoutubeSearchResponse, SYoutubeSearchItem
-        result_items: list[SYoutubeSearchItem] = []
-
-        def get_text_runs(runs):
-            try:
-                return "".join(run.get("text", "") for run in (runs or [])).strip()
-            except Exception:
-                return ""
-
-        upload_jobs = []
-        for it in items:
-            if not isinstance(it, dict):
-                continue
-            # Video URL
-            url = None
-            try:
-                url_path = (
-                    it.get("navigationEndpoint", {})
-                    .get("commandMetadata", {})
-                    .get("webCommandMetadata", {})
-                    .get("url")
-                )
-                if isinstance(url_path, str) and url_path.startswith("/watch"):
-                    url = f"https://www.youtube.com{url_path}"
-            except Exception:
-                pass
-            if not url:
-                continue
-
-            # Title
-            title = get_text_runs((it.get("title") or {}).get("runs")) or ""
-
-            # Author/channel
-            author = None
-            owner_text = (it.get("longBylineText") or {}).get("runs") or (it.get("ownerText") or {}).get("runs")
-            author = get_text_runs(owner_text) if owner_text else None
-
-            # Thumbnails
-            thumbnail_url = None
-            try:
-                thumbs = (it.get("thumbnail") or {}).get("thumbnails", [])
-                if thumbs:
-                    thumbnail_url = thumbs[-1].get("url")
-            except Exception:
-                pass
-
-            # Duration
-            duration_text = None
-            duration_seconds = None
-            try:
-                duration_text = (it.get("lengthText") or {}).get("simpleText")
-                if duration_text:
-                    parts = duration_text.split(":")
-                    secs = 0
-                    for p in parts:
-                        secs = secs * 60 + int(p)
-                    duration_seconds = secs
-            except Exception:
-                pass
-
-            result_items.append(SYoutubeSearchItem(
-                video_url=url,
-                title=title or url,
-                author=author,
-                duration_text=duration_text,
-                duration_seconds=duration_seconds,
-                thumbnail_url=thumbnail_url,
-            ))
-
-            # S3 upload job for preview if available
-            if thumbnail_url:
-                upload_jobs.append(save_preview_on_s3(thumbnail_url, title or url, (author or "youtube")))
-
-            if len(result_items) >= 30:
-                break
-
-        # Upload previews to S3 concurrently; on failure keep original URL
-        if upload_jobs:
-            try:
-                uploaded_urls = await asyncio.gather(*upload_jobs, return_exceptions=True)
-                idx = 0
-                for i, item in enumerate(result_items):
-                    if item.thumbnail_url:
-                        new_url = uploaded_urls[idx]
-                        idx += 1
-                        if isinstance(new_url, str) and new_url:
-                            item.thumbnail_url = new_url
-            except Exception:
-                pass
-
-        return SYoutubeSearchResponse(items=result_items)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"YouTube search failed: {e}")
+    result_items = await YouTubeParser.search_videos(q)
+    return SYoutubeSearchResponse(items=result_items)

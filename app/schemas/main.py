@@ -45,8 +45,7 @@ class SYoutubeSearchItem(BaseModel):
     video_url: str
     title: str
     author: Optional[str] = field(default=None)
-    duration_text: Optional[str] = field(default=None)
-    duration_seconds: Optional[int] = field(default=None)
+    duration: Optional[int] = field(default=None)
     thumbnail_url: Optional[str] = field(default=None)
 
 

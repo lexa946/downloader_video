@@ -1,8 +1,15 @@
+import re
 import asyncio
+import aiohttp
+import json as _json
+
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import quote_plus
 
-from pytubefix import Stream, YouTube, StreamQuery
+from fastapi import HTTPException
+from pytubefix import Stream, YouTube, StreamQuery, Search
+from bs4 import BeautifulSoup
 
 from app.config import settings
 from app.models.cache import redis_cache
@@ -10,16 +17,53 @@ from app.models.post_process import PostPrecess
 from app.models.status import VideoDownloadStatus
 from app.models.types import DownloadTask
 from app.parsers.base import BaseParser
-from app.schemas.main import SVideoFormat, SVideoResponse, SVideoDownload
+from app.schemas.main import SVideoFormat, SVideoResponse, SVideoDownload, SYoutubeSearchItem
 from app.utils.validators_utils import fallback_background_task
-from app.utils.video_utils import save_preview_on_s3, combine_audio_and_video, convert_to_mp3, cut_media
-
+from app.utils.video_utils import save_preview_on_s3, combine_audio_and_video, convert_to_mp3
 
 class YouTubeParser(BaseParser):
 
     def __init__(self, url):
         self.url = url
         self._yt = YouTube(self.url)
+
+    @classmethod
+    async def search_videos(cls, query: str) -> list[SYoutubeSearchItem]:
+
+        def sync_search():
+            result_items = []
+            upload_jobs = []
+            search = Search(query)
+            video: YouTube
+            for video in search.results:
+                result_items.append(SYoutubeSearchItem(
+                    video_url=video.watch_url,
+                    title=video.title,
+                    author=video.author,
+                    duration=timedelta(milliseconds=int(video.streams.first().durationMs)).seconds,
+                    thumbnail_url=video.thumbnail_url,
+                ))
+
+                if video.thumbnail_url:
+                    upload_jobs.append(save_preview_on_s3(video.thumbnail_url, video.title, video.author))
+            return result_items, upload_jobs
+
+        result_items, upload_jobs = await asyncio.to_thread(sync_search)
+
+        if upload_jobs:
+            uploaded_urls = await asyncio.gather(*upload_jobs, return_exceptions=True)
+            idx = 0
+            for i, item in enumerate(result_items):
+                if item.thumbnail_url:
+                    new_url = uploaded_urls[idx]
+                    idx += 1
+                    if isinstance(new_url, str) and new_url:
+                        item.thumbnail_url = new_url
+
+        return result_items
+
+
+
 
     @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):

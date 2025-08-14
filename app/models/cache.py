@@ -86,7 +86,7 @@ class RedisCache:
         # Auto-release per-user lock if task has finished (completed, error, canceled, or done)
         try:
             status = task.video_status.status
-            if status in (VideoDownloadStatus.COMPLETED, VideoDownloadStatus.ERROR, VideoDownloadStatus.DONE, getattr(VideoDownloadStatus, 'CANCELED', 'canceled')):
+            if status in (VideoDownloadStatus.COMPLETED, VideoDownloadStatus.ERROR, VideoDownloadStatus.DONE, VideoDownloadStatus.CANCELED):
                 user_id = await self.get_task_user(task_id)
                 if user_id:
                     await self.release_user_active_task(user_id, task_id)

@@ -144,8 +144,7 @@ class YouTubeParser(BaseParser):
                     video_url=url,
                     title=title or url,
                     author=author,
-                    duration_text=duration_text,
-                    duration_seconds=duration_seconds,
+                    duration=duration_seconds,
                     thumbnail_url=thumbnail_url,
                 ))
 

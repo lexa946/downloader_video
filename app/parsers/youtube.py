@@ -1,11 +1,15 @@
 import asyncio
+import re
 from datetime import timedelta
+import json as _json
 from pathlib import Path
 from urllib.parse import quote_plus
 
+import aiohttp
 from fastapi import HTTPException
 from pytubefix import Stream, YouTube, StreamQuery, Search
 from bs4 import BeautifulSoup
+from sqlalchemy.util import await_fallback
 
 from app.config import settings
 from app.exceptions import DownloadUserCanceledException
@@ -28,39 +32,6 @@ class YouTubeParser(BaseParser):
 
     @classmethod
     async def search_videos(cls, query: str) -> list[SYoutubeSearchItem]:
-
-        # def sync_search():
-        #     result_items = []
-        #     upload_jobs = []
-        #     search = Search(query)
-        #     video: YouTube
-        #     for video in search.results:
-        #         result_items.append(SYoutubeSearchItem(
-        #             video_url=video.watch_url,
-        #             title=video.title,
-        #             author=video.author,
-        #             duration=timedelta(milliseconds=int(video.streams.first().durationMs)).seconds,
-        #             thumbnail_url=video.thumbnail_url,
-        #         ))
-        #
-        #         if video.thumbnail_url:
-        #             upload_jobs.append(save_preview_on_s3(video.thumbnail_url, video.title, video.author))
-        #     return result_items, upload_jobs
-        #
-        # result_items, upload_jobs = await asyncio.to_thread(sync_search)
-        #
-        # if upload_jobs:
-        #     uploaded_urls = await asyncio.gather(*upload_jobs, return_exceptions=True)
-        #     idx = 0
-        #     for i, item in enumerate(result_items):
-        #         if item.thumbnail_url:
-        #             new_url = uploaded_urls[idx]
-        #             idx += 1
-        #             if isinstance(new_url, str) and new_url:
-        #                 item.thumbnail_url = new_url
-        #
-        # return result_items
-
         try:
             search_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
 
@@ -179,15 +150,40 @@ class YouTubeParser(BaseParser):
             bytes_received = stream_.filesize - bytes_remaining
             percent = round(100.0 * bytes_received / float(stream_.filesize), 1)
             task.video_status.percent = float(percent)
-            async def _update_and_check():
-                await redis_cache.set_download_task(task_id, task)
-                if await redis_cache.is_task_canceled(task_id):
-                    raise DownloadUserCanceledException()
-            event_loop.create_task(_update_and_check())
+            event_loop.create_task(redis_cache.set_download_task(task_id, task))
+            print(f"YouTubeParser: URL {download_video.url} download progress: {percent:.2f}%")
 
         self._yt.register_on_progress_callback(post_process_hook)
-        try:
-            if not download_video.video_format_id:
+
+        if not download_video.video_format_id:
+            task.video_status.description = "Downloading audio track"
+            await redis_cache.set_download_task(task_id, task)
+            audio_path = Path(await asyncio.to_thread(
+                self._yt.streams.get_by_itag(download_video.audio_format_id).download,
+                output_path=download_path.as_posix(),
+                filename_prefix=f"{task_id}_audio_"
+            ))
+
+            task.video_status.description = "Converting to MP3"
+            await redis_cache.set_download_task(task_id, task)
+            out_path = audio_path.with_suffix('.mp3')
+            await asyncio.to_thread(convert_to_mp3,
+                                audio_path.as_posix(),
+                                out_path.as_posix()
+                                )
+            audio_path.unlink(missing_ok=True)
+            task.filepath = out_path
+
+        else:
+            # Стандартная логика для видео
+            task.video_status.description = "Downloading video track"
+            await redis_cache.set_download_task(task_id, task)
+            video_path = Path(await asyncio.to_thread(
+                self._yt.streams.get_by_itag(download_video.video_format_id).download,
+                output_path=download_path.as_posix(),
+                filename_prefix=f"{task_id}_video_"
+            ))
+            if download_video.audio_format_id != download_video.video_format_id:
                 task.video_status.description = "Downloading audio track"
                 await redis_cache.set_download_task(task_id, task)
                 audio_path = Path(await asyncio.to_thread(
@@ -195,58 +191,25 @@ class YouTubeParser(BaseParser):
                     output_path=download_path.as_posix(),
                     filename_prefix=f"{task_id}_audio_"
                 ))
-
-                task.video_status.description = "Converting to MP3"
+                task.video_status.description = "Merging tracks"
                 await redis_cache.set_download_task(task_id, task)
-                out_path = audio_path.with_suffix('.mp3')
-                await asyncio.to_thread(convert_to_mp3,
-                                    audio_path.as_posix(),
-                                    out_path.as_posix()
-                                    )
+                out_path = video_path.with_name(video_path.stem + "_out.mp4")
+                await asyncio.to_thread(combine_audio_and_video,
+                                        video_path.as_posix(),
+                                        audio_path.as_posix(),
+                                        out_path.as_posix()
+                                        )
                 audio_path.unlink(missing_ok=True)
-                task.filepath = out_path
-                
-            else:
-                # Стандартная логика для видео
-                task.video_status.description = "Downloading video track"
-                await redis_cache.set_download_task(task_id, task)
-                video_path = Path(await asyncio.to_thread(
-                    self._yt.streams.get_by_itag(download_video.video_format_id).download,
-                    output_path=download_path.as_posix(),
-                    filename_prefix=f"{task_id}_video_"
-                ))
-                if download_video.audio_format_id != download_video.video_format_id:
-                    task.video_status.description = "Downloading audio track"
-                    await redis_cache.set_download_task(task_id, task)
-                    audio_path = Path(await asyncio.to_thread(
-                        self._yt.streams.get_by_itag(download_video.audio_format_id).download,
-                        output_path=download_path.as_posix(),
-                        filename_prefix=f"{task_id}_audio_"
-                    ))
-                    task.video_status.description = "Merging tracks"
-                    await redis_cache.set_download_task(task_id, task)
-                    out_path = video_path.with_name(video_path.stem + "_out.mp4")
-                    await asyncio.to_thread(combine_audio_and_video,
-                                            video_path.as_posix(),
-                                            audio_path.as_posix(),
-                                            out_path.as_posix()
-                                            )
-                    audio_path.unlink(missing_ok=True)
-                    video_path.unlink(missing_ok=True)
-                    video_path = out_path
-                task.filepath = video_path
+                video_path.unlink(missing_ok=True)
+                video_path = out_path
+            task.filepath = video_path
 
-            post_process = PostPrecess(task, download_video)
-            await post_process.process()
+        post_process = PostPrecess(task, download_video)
+        await post_process.process()
 
-            task.video_status.status = VideoDownloadStatus.COMPLETED
-            task.video_status.description = VideoDownloadStatus.COMPLETED
-            await redis_cache.set_download_task(task_id, task)
-
-        except Exception as e:
-            task.video_status.status = VideoDownloadStatus.ERROR
-            task.video_status.description = str(e)
-            await redis_cache.set_download_task(task_id, task)
+        task.video_status.status = VideoDownloadStatus.COMPLETED
+        task.video_status.description = VideoDownloadStatus.COMPLETED
+        await redis_cache.set_download_task(task_id, task)
 
 
     @staticmethod

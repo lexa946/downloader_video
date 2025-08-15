@@ -18,7 +18,6 @@ services:
       - "5432:5432"
     volumes:
       - ./pg_data:/var/lib/postgresql/data
-    container_name: downloader_postgres
 
   downloader_video:
     restart: unless-stopped

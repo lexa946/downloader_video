@@ -1,10 +1,11 @@
-name: downloader_video_prod
+name: downloader_test
 services:
   redis:
+    container_name: downloader_redis_test
     restart: unless-stopped
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "63799:6379"
     volumes:
       - ./redis_data:/data
     command: redis-server --save 60 1 --loglevel warning
@@ -15,18 +16,19 @@ services:
     env_file:
       - .env.postgres
     ports:
-      - "5432:5432"
+      - "54322:5432"
     volumes:
       - ./pg_data:/var/lib/postgresql/data
 
-  downloader_video_test:
+  downloader_video:
+    container_name: downloader_video_test
     restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
-    image: downloader_video:latest
+    image: downloader_video_test:latest
     ports:
-      - "8084:80"
+      - "8085:80"
     volumes:
       - ./.env:/.env:ro
       - ./app:/app:ro

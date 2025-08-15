@@ -8,6 +8,7 @@ import aiohttp
 from bs4 import BeautifulSoup
 
 from app.config import settings
+from app.exceptions import DownloadUserCanceledException
 from app.models.cache import redis_cache
 from app.models.post_process import PostPrecess
 from app.models.status import VideoDownloadStatus
@@ -20,7 +21,6 @@ from app.utils.video_utils import (
     save_preview_on_s3,
     convert_to_mp3,
     download_hls_to_file,
-    download_hls_av_to_file,
 )
 
 
@@ -316,57 +316,42 @@ class RutubeParser(BaseParser):
         download_path = Path(settings.DOWNLOAD_FOLDER) / author_dir_name / file_name
         download_path.parent.mkdir(parents=True, exist_ok=True)
 
-        task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
-        await redis_cache.set_download_task(task_id, task)
-
-        # For audio we will first download MP4 and then convert to mp3
         temp_path = download_path.with_suffix(".temp.mp4") if is_audio_only else download_path
+        task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
+        task.filepath = temp_path
+        await redis_cache.set_download_task(task_id, task)
 
         event_loop = asyncio.get_running_loop()
 
         def on_progress(seconds_done: float, percent: float):
             task.video_status.percent = float(percent)
-            try:
-                # We're in a worker thread; schedule coroutine on the main loop safely
-                asyncio.run_coroutine_threadsafe(
-                    redis_cache.set_download_task(task_id, task),
-                    event_loop,
-                )
-            except Exception:
-                pass
+            asyncio.run_coroutine_threadsafe(redis_cache.set_download_task(task_id, task), event_loop)
 
-        # Download: if separate audio present, mux AV; else just copy
-        if is_audio_only:
-            # Prefer dedicated audio HLS if present
-            audio_hls = chosen_variant.get("audio") or chosen_variant.get("video")
-            await asyncio.to_thread(
-                download_hls_to_file,
-                audio_hls,
-                temp_path.as_posix(),
-                int(video.duration) if video.duration else 0,
-                on_progress,
-                self._headers,
-            )
-        else:
-            if "audio" in chosen_variant:
-                await asyncio.to_thread(
-                    download_hls_av_to_file,
-                    chosen_variant["video"],
-                    chosen_variant["audio"],
-                    temp_path.as_posix(),
-                    int(video.duration) if video.duration else 0,
-                    on_progress,
-                    self._headers,
-                )
-            else:
-                await asyncio.to_thread(
-                    download_hls_to_file,
-                    chosen_variant["video"],
-                    temp_path.as_posix(),
-                    int(video.duration) if video.duration else 0,
-                    on_progress,
-                    self._headers,
-                )
+        is_cancel = False
+        async def check_redis_cancel():
+            nonlocal is_cancel
+            is_cancel = await redis_cache.is_task_canceled(task_id)
+
+        def check():
+            asyncio.run_coroutine_threadsafe(check_redis_cancel(), event_loop)
+            return is_cancel
+
+        audio_hls = chosen_variant.get("audio") or chosen_variant.get("video")
+        video_hls = None
+
+        if not is_audio_only:
+            video_hls = chosen_variant["video"]
+
+        await asyncio.to_thread(
+            download_hls_to_file,
+            audio_hls,
+            temp_path.as_posix(),
+            int(video.duration) if video.duration else 0,
+            video_hls,
+            on_progress,
+            self._headers,
+            check
+        )
 
         if is_audio_only:
             task.video_status.description = "Converting to MP3"

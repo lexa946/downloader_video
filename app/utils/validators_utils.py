@@ -1,10 +1,13 @@
 from functools import wraps
 import inspect
 from uuid import UUID
+from shutil import rmtree
+
 
 from fastapi import HTTPException
 from starlette import status
 
+from app.exceptions import DownloadUserCanceledException
 from app.models.cache import redis_cache
 from app.models.status import VideoDownloadStatus
 from app.models.types import DownloadTask
@@ -17,6 +20,24 @@ def fallback_background_task(func):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
         try:
             await func(self, task_id, download_video)
+        except DownloadUserCanceledException as user_canceled:
+            task: DownloadTask = await redis_cache.get_download_task(task_id)
+            if task.filepath:
+                if task.filepath.is_file():
+                    task.filepath.unlink(missing_ok=True)
+                else:
+                    if self.__class__.__name__ == "VkParser":
+                        rmtree(task.filepath)
+                    elif self.__class__.__name__ == "YouTubeParser":
+                        for file in task.filepath.iterdir():
+                            if file.stem.startswith(task.video_status.task_id):
+                                file.unlink(missing_ok=True)
+
+
+            task.video_status.status = VideoDownloadStatus.CANCELED
+            task.video_status.description = user_canceled.__doc__
+            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.clear_task_canceled(task_id)
         except Exception as e:
             task.video_status.status = VideoDownloadStatus.ERROR
             task.video_status.description = str(e)

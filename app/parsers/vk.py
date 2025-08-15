@@ -9,6 +9,7 @@ import aiohttp
 from dataclasses import dataclass
 
 from app.config import settings
+from app.exceptions import DownloadUserCanceledException
 from app.models.cache import redis_cache
 from app.models.post_process import PostPrecess
 from app.models.status import VideoDownloadStatus
@@ -110,8 +111,10 @@ class VkParser(BaseParser):
                     async with self._lock:
                         self.bytes_read += len(chunk)
                         task.video_status.percent = int((self.bytes_read / self.total_size) * 100)
-                        await redis_cache.set_download_task(task_id, task)  # Update task in Redis
+                        await redis_cache.set_download_task(task_id, task)
                     await f.write(chunk)
+                    if await redis_cache.is_task_canceled(task_id):
+                        raise DownloadUserCanceledException()
         return part_file
 
     @staticmethod
@@ -188,11 +191,21 @@ class VkParser(BaseParser):
                 ) if i < self.CONNECTIONS_COUNT - 1 else self.total_size - 1
                 ranges.append((start, end, i))
 
+            task.filepath = download_path.parent / task_id
+            await redis_cache.set_download_task(task_id, task)
             tasks = [
-                self._fetch_range(session, content_url, start, end, part_num, task_id, task, temp_path)
+                asyncio.create_task(
+                    self._fetch_range(session, content_url, start, end, part_num, task_id, task, temp_path)
+                )
                 for start, end, part_num in ranges
             ]
-            part_files = await asyncio.gather(*tasks)
+            try:
+                part_files = await asyncio.gather(*tasks)
+            except DownloadUserCanceledException:
+                for t in tasks:
+                    t.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                raise
 
             task.video_status.description = "Merging parts"
             await redis_cache.set_download_task(task_id, task)

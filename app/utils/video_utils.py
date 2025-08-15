@@ -11,6 +11,7 @@ import aiohttp
 from Crypto.Util.py3compat import BytesIO
 
 from app.config import settings
+from app.exceptions import DownloadUserCanceledException
 from app.models.cache import redis_cache
 from app.models.status import VideoDownloadStatus
 from app.models.types import DownloadTask
@@ -128,32 +129,44 @@ def _build_ffmpeg_headers_arg(headers: Optional[Dict[str, str]]) -> list[str]:
     return ["-headers", header_blob]
 
 
-def download_hls_to_file(hls_url: str,
+def download_hls_to_file(audio_hls_url: str,
                          output_path: str,
                          duration_seconds: int,
+                         video_hls_url: str = None,
                          on_progress: Optional[Callable[[float, float], None]] = None,
-                         headers: Optional[Dict[str, str]] = None) -> None:
-    """
-    Загрузка HLS-потока через ffmpeg с прогрессом.
-
-    - hls_url: URL мастер/вариант m3u8
-    - output_path: путь к результирующему MP4
-    - duration_seconds: длительность контента (секунды) для расчета процента
-    - on_progress: callback(seconds_done, percent)
-    - headers: HTTP заголовки для запроса
-    """
-    cmd = [
-        FFMPEG,
-        *(_build_ffmpeg_headers_arg(headers)),
-        "-i", hls_url,
-        "-c", "copy",
-        "-bsf:a", "aac_adtstoasc",
-        "-movflags", "+faststart",
-        "-progress", "pipe:1",
-        "-loglevel", "error",
-        "-y",
-        output_path,
-    ]
+                         headers: Optional[Dict[str, str]] = None,
+                         check_cancel = None,
+                         ) -> None:
+    headers_arg = _build_ffmpeg_headers_arg(headers)
+    if video_hls_url is None:
+        cmd = [
+            FFMPEG,
+            *headers_arg, "-i", audio_hls_url,
+            "-c", "copy",
+            "-bsf:a", "aac_adtstoasc",
+            "-movflags", "+faststart",
+            "-progress", "pipe:1",
+            "-loglevel", "error",
+            "-y",
+            output_path,
+        ]
+    else:
+        cmd = [
+            FFMPEG,
+            *headers_arg, "-i", video_hls_url,
+            *headers_arg, "-i", audio_hls_url,
+            "-c:v", "copy",
+            "-c:a", "copy",
+            "-bsf:a", "aac_adtstoasc",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-shortest",
+            "-movflags", "+faststart",
+            "-progress", "pipe:1",
+            "-loglevel", "error",
+            "-y",
+            output_path,
+        ]
 
     process = subprocess.Popen(
         cmd,
@@ -168,8 +181,9 @@ def download_hls_to_file(hls_url: str,
         if process.stdout is not None:
             for line in process.stdout:
                 line = line.strip()
-                # ffmpeg -progress outputs key=value lines
-                # we look for out_time_ms
+                if check_cancel and check_cancel():
+                    process.terminate()
+                    raise DownloadUserCanceledException()
                 if line.startswith("out_time_ms="):
                     try:
                         out_time_ms = float(line.split("=", 1)[1])
@@ -192,77 +206,6 @@ def download_hls_to_file(hls_url: str,
         process.wait()
         if process.returncode != 0:
             # capture stderr for diagnostics
-            err = process.stderr.read() if process.stderr else ""
-            raise RuntimeError(f"ffmpeg failed with code {process.returncode}: {err}")
-    finally:
-        try:
-            if process.stdout:
-                process.stdout.close()
-            if process.stderr:
-                process.stderr.close()
-        except Exception:
-            pass
-
-
-def download_hls_av_to_file(video_hls_url: str,
-                            audio_hls_url: str,
-                            output_path: str,
-                            duration_seconds: int,
-                            on_progress: Optional[Callable[[float, float], None]] = None,
-                            headers: Optional[Dict[str, str]] = None) -> None:
-    """
-    Загрузка раздельных HLS дорожек (видео + аудио) и муксинг в один MP4.
-    """
-    headers_arg = _build_ffmpeg_headers_arg(headers)
-
-    cmd = [
-        FFMPEG,
-        *headers_arg, "-i", video_hls_url,
-        *headers_arg, "-i", audio_hls_url,
-        "-c:v", "copy",
-        "-c:a", "copy",
-        "-bsf:a", "aac_adtstoasc",
-        "-map", "0:v:0",
-        "-map", "1:a:0",
-        "-shortest",
-        "-movflags", "+faststart",
-        "-progress", "pipe:1",
-        "-loglevel", "error",
-        "-y",
-        output_path,
-    ]
-
-    process = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1,
-    )
-
-    seconds_done = 0.0
-    try:
-        if process.stdout is not None:
-            for line in process.stdout:
-                line = line.strip()
-                if line.startswith("out_time_ms="):
-                    try:
-                        out_time_ms = float(line.split("=", 1)[1])
-                        seconds_done = out_time_ms / 1_000_000.0
-                        if duration_seconds and duration_seconds > 0:
-                            percent = max(0.0, min(100.0, (seconds_done / duration_seconds) * 100.0))
-                        else:
-                            percent = 0.0
-                        if on_progress:
-                            on_progress(seconds_done, percent)
-                    except Exception:
-                        pass
-                elif line == "progress=end":
-                    percent = 100.0
-                    if on_progress:
-                        on_progress(seconds_done, percent)
-        process.wait()
-        if process.returncode != 0:
             err = process.stderr.read() if process.stderr else ""
             raise RuntimeError(f"ffmpeg failed with code {process.returncode}: {err}")
     finally:

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.config import settings
+from app.exceptions import DownloadUserCanceledException
 from app.models.cache import redis_cache
 from app.models.post_process import PostPrecess
 from app.models.status import VideoDownloadStatus
@@ -105,78 +106,75 @@ class TikTokParser(BaseParser):
         }
         api_url = f"https://www.tikwm.com/api/?url={download_video.url}&hd=1"
 
-        try:
-            # Resolve URLs
-            async with aiohttp.ClientSession(headers=headers_tw) as session:
-                async with session.get(api_url) as resp:
-                    resp.raise_for_status()
-                    payload = await resp.json()
-            if payload.get("code") != 0 or not payload.get("data"):
-                raise ValueError("TikTok: cannot resolve media urls")
+        async with aiohttp.ClientSession(headers=headers_tw) as session:
+            async with session.get(api_url) as resp:
+                resp.raise_for_status()
+                payload = await resp.json()
+        if payload.get("code") != 0 or not payload.get("data"):
+            raise ValueError("TikTok: cannot resolve media urls")
 
-            data = payload["data"]
-            video_url: Optional[str] = data.get("hdplay") or data.get("wmplay") or data.get("play")
-            audio_url: Optional[str] = data.get("music")
-            title: str = data.get("title") or "tiktok_video"
-            author = "tiktok"
-            author_obj = data.get("author")
-            if isinstance(author_obj, dict):
-                author = author_obj.get("unique_id") or author_obj.get("nickname") or author
-            elif isinstance(author_obj, str) and author_obj:
-                author = author_obj
+        data = payload["data"]
+        video_url: Optional[str] = data.get("hdplay") or data.get("wmplay") or data.get("play")
+        audio_url: Optional[str] = data.get("music")
+        title: str = data.get("title") or "tiktok_video"
+        author = "tiktok"
+        author_obj = data.get("author")
+        if isinstance(author_obj, dict):
+            author = author_obj.get("unique_id") or author_obj.get("nickname") or author
+        elif isinstance(author_obj, str) and author_obj:
+            author = author_obj
 
-            is_audio_only = not download_video.video_format_id
-            extension = ".mp3" if is_audio_only else ".mp4"
-            out_dir = Path(settings.DOWNLOAD_FOLDER) / remove_all_spec_chars(author)
-            out_dir.mkdir(parents=True, exist_ok=True)
-            out_path = out_dir / f"{task_id}_{remove_all_spec_chars(title)}{extension}"
+        is_audio_only = not download_video.video_format_id
+        extension = ".mp3" if is_audio_only else ".mp4"
+        out_dir = Path(settings.DOWNLOAD_FOLDER) / remove_all_spec_chars(author)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{task_id}_{remove_all_spec_chars(title)}{extension}"
 
-            # choose source
-            source_url = audio_url if is_audio_only and audio_url else video_url
-            if not source_url:
-                raise ValueError("TikTok: no suitable media stream")
+        # choose source
+        source_url = audio_url if is_audio_only and audio_url else video_url
+        if not source_url:
+            raise ValueError("TikTok: no suitable media stream")
 
-            temp_path = out_path
-            if is_audio_only and audio_url is None:
-                temp_path = out_path.with_suffix(".temp")
+        temp_path = out_path
+        if is_audio_only and audio_url is None:
+            temp_path = out_path.with_suffix(".temp")
 
-            task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
+        task.filepath = temp_path
+        task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
+        await redis_cache.set_download_task(task_id, task)
+
+        async with aiohttp.ClientSession(headers={"User-Agent": TIKTOK_HEADERS["User-Agent"]}) as dl_sess:
+            async with dl_sess.get(source_url) as r:
+                r.raise_for_status()
+                total = int(r.headers.get("Content-Length", 0))
+                read = 0
+                async with aiofiles.open(temp_path, "wb") as f:
+                    async for chunk in r.content.iter_chunked(1024 * 64):
+                        if not chunk:
+                            break
+                        await f.write(chunk)
+                        read += len(chunk)
+                        if total:
+                            task.video_status.percent = int(read / total * 100)
+                            await redis_cache.set_download_task(task_id, task)
+                        if await redis_cache.is_task_canceled(task_id):
+                            raise DownloadUserCanceledException()
+
+
+        # Convert to MP3 if needed
+        if is_audio_only and audio_url is None:
+            task.video_status.description = "Converting to MP3"
             await redis_cache.set_download_task(task_id, task)
+            await convert_to_mp3(temp_path.as_posix(), out_path.as_posix())
+            temp_path.unlink(missing_ok=True)
 
-            async with aiohttp.ClientSession(headers={"User-Agent": TIKTOK_HEADERS["User-Agent"]}) as dl_sess:
-                async with dl_sess.get(source_url) as r:
-                    r.raise_for_status()
-                    total = int(r.headers.get("Content-Length", 0))
-                    read = 0
-                    async with aiofiles.open(temp_path, "wb") as f:
-                        async for chunk in r.content.iter_chunked(1024 * 64):
-                            if not chunk:
-                                break
-                            await f.write(chunk)
-                            read += len(chunk)
-                            if total:
-                                task.video_status.percent = int(read / total * 100)
-                                await redis_cache.set_download_task(task_id, task)
+        task.filepath = out_path
 
-            # Convert to MP3 if needed
-            if is_audio_only and audio_url is None:
-                task.video_status.description = "Converting to MP3"
-                await redis_cache.set_download_task(task_id, task)
-                await convert_to_mp3(temp_path.as_posix(), out_path.as_posix())
-                temp_path.unlink(missing_ok=True)
+        post_process = PostPrecess(task, download_video)
+        await post_process.process()
 
-            task.filepath = out_path
-
-            post_process = PostPrecess(task, download_video)
-            await post_process.process()
-
-            task.video_status.status = VideoDownloadStatus.COMPLETED
-            task.video_status.description = VideoDownloadStatus.COMPLETED
-            await redis_cache.set_download_task(task_id, task)
-
-        except Exception as e:
-            task.video_status.status = VideoDownloadStatus.ERROR
-            task.video_status.description = str(e)
-            await redis_cache.set_download_task(task_id, task)
+        task.video_status.status = VideoDownloadStatus.COMPLETED
+        task.video_status.description = VideoDownloadStatus.COMPLETED
+        await redis_cache.set_download_task(task_id, task)
 
 

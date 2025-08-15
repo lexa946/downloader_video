@@ -1,3 +1,4 @@
+name: downloader_video_prod
 services:
   redis:
     restart: unless-stopped

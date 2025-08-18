@@ -191,12 +191,12 @@ class InstagramParser(BaseParser):
             raise ValueError("Unable to find media info JSON or og:video meta")
 
         og_image = soup.select_one("meta[property='og:image']")
-        preview = og_image.get("content") if og_image and og_image.get("content") else ""
+        preview = og_image.get("content", "") if og_image else ""
 
         og_desc = soup.select_one("meta[property='og:description']")
         author = "instagram_user"
         if og_desc and og_desc.get("content"):
-            m = re.search(r"@([A-Za-z0-9._]+)", og_desc.get("content") or "")
+            m = re.search(r"@([A-Za-z0-9._]+)", og_desc.get("content", ""))
             if m:
                 author = m.group(1)
 

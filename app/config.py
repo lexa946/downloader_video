@@ -14,9 +14,6 @@ class Settings(BaseSettings):
     S3_ENDPOINT_URL: str
     S3_BUCKET_NAME: str
 
-    INSTAGRAM_CSRFTOKEN: str
-    INSTAGRAM_SESSIONID: str
-
     # Redis settings
     REDIS_HOST: str
     REDIS_PORT: int

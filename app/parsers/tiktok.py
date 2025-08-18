@@ -2,6 +2,7 @@ import aiohttp
 import aiofiles
 from pathlib import Path
 from typing import Optional
+from dataclasses import dataclass
 
 from app.config import settings
 from app.exceptions import DownloadUserCanceledException
@@ -16,25 +17,32 @@ from app.utils.validators_utils import fallback_background_task
 from app.utils.video_utils import save_preview_on_s3, convert_to_mp3
 
 
-TIKTOK_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-}
+@dataclass
+class TikTokVideo:
+    video_url: str
+    audio_url: str
+    title: str
+    author: str
+    duration: int
+    preview_url: str
+    video_size: int
+    audio_size: int
 
 
 class TikTokParser(BaseParser):
     def __init__(self, url: str):
         self.url = url if ('?lang=' in url or '&lang=' in url) else (url + ('&lang=en' if '?' in url else '?lang=en'))
-
-    async def get_formats(self) -> SVideoResponse:
-        headers_tw = {
-            **TIKTOK_HEADERS,
+        self.api_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Referer": "https://www.tikwm.com/",
             "Accept": "application/json, text/plain, */*",
         }
-        api_url = f"https://www.tikwm.com/api/?url={self.url}&hd=1"
+        self.api_url = f"https://www.tikwm.com/api/?url={self.url}&hd=1"
 
-        async with aiohttp.ClientSession(headers=headers_tw) as session:
-            async with session.get(api_url) as resp:
+
+    async def _get_video_info(self):
+        async with aiohttp.ClientSession(headers=self.api_headers) as session:
+            async with session.get(self.api_url) as resp:
                 resp.raise_for_status()
                 payload = await resp.json()
 
@@ -44,9 +52,11 @@ class TikTokParser(BaseParser):
         data = payload["data"]
         video_url: Optional[str] = data.get("hdplay") or data.get("wmplay") or data.get("play")
         audio_url: Optional[str] = data.get("music")
-        title: str = data.get("title") or "tiktok_video"
-        duration: int = int(data.get("duration") or 0)
-        cover: Optional[str] = data.get("cover") or data.get("origin_cover") or None
+        title: str = data.get("title", "tiktok_video") 
+        if len(title) > 50:
+            title = title[:50] + "..."
+        duration: int = int(data.get("duration", 0))
+        cover: Optional[str] = data.get("cover") or data.get("origin_cover")
         author: str = "tiktok"
         author_obj = data.get("author")
         if isinstance(author_obj, dict):
@@ -54,24 +64,19 @@ class TikTokParser(BaseParser):
         elif isinstance(author_obj, str) and author_obj:
             author = author_obj
 
-        # Resolve sizes if possible (HEAD). If not, keep 0; UI can still show formats
         video_size = 0
         audio_size = 0
-        async with aiohttp.ClientSession(headers={"User-Agent": TIKTOK_HEADERS["User-Agent"]}) as hs:
+        async with aiohttp.ClientSession(headers={"User-Agent": self.api_headers["User-Agent"]}) as hs:
             if video_url:
-                try:
-                    async with hs.head(video_url, allow_redirects=True) as h:
-                        if h.status < 400 and h.headers.get("Content-Length"):
-                            video_size = int(h.headers["Content-Length"])
-                except Exception:
-                    pass
+                async with hs.head(video_url, allow_redirects=True) as h:
+                    if h.status < 400 and h.headers.get("Content-Length"):
+                        video_size = int(h.headers["Content-Length"])
+
             if audio_url:
-                try:
-                    async with hs.head(audio_url, allow_redirects=True) as ah:
-                        if ah.status < 400 and ah.headers.get("Content-Length"):
-                            audio_size = int(ah.headers["Content-Length"])
-                except Exception:
-                    pass
+                async with hs.head(audio_url, allow_redirects=True) as ah:
+                    if ah.status < 400 and ah.headers.get("Content-Length"):
+                        audio_size = int(ah.headers["Content-Length"])
+
             if not audio_size and duration:
                 audio_size = int((128000 / 8) * duration)
 
@@ -82,68 +87,50 @@ class TikTokParser(BaseParser):
             except Exception:
                 preview_url = cover
 
+        return TikTokVideo(video_url, audio_url, title, author, duration, preview_url, video_size, audio_size)
+
+    async def get_formats(self) -> SVideoResponse:
+        video = await self._get_video_info()
+
         formats = [
-            SVideoFormat(quality="MP4", video_format_id="video", audio_format_id="audio", filesize=video_size),
-            SVideoFormat(quality="Audio only", video_format_id="", audio_format_id="audio", filesize=audio_size),
+            SVideoFormat(quality="MP4", video_format_id="video", audio_format_id="audio", filesize=video.video_size),
+            SVideoFormat(quality="Audio only", video_format_id="", audio_format_id="audio", filesize=video.audio_size),
         ]
 
         return SVideoResponse(
             url=self.url,
-            title=title,
-            author=author,
-            preview_url=preview_url,
-            duration=duration,
+            title=video.title,
+            author=video.author,
+            preview_url=video.preview_url,
+            duration=video.duration,
             formats=formats,
         )
 
     @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
-        headers_tw = {
-            **TIKTOK_HEADERS,
-            "Referer": "https://www.tikwm.com/",
-            "Accept": "application/json, text/plain, */*",
-        }
-        api_url = f"https://www.tikwm.com/api/?url={download_video.url}&hd=1"
 
-        async with aiohttp.ClientSession(headers=headers_tw) as session:
-            async with session.get(api_url) as resp:
-                resp.raise_for_status()
-                payload = await resp.json()
-        if payload.get("code") != 0 or not payload.get("data"):
-            raise ValueError("TikTok: cannot resolve media urls")
-
-        data = payload["data"]
-        video_url: Optional[str] = data.get("hdplay") or data.get("wmplay") or data.get("play")
-        audio_url: Optional[str] = data.get("music")
-        title: str = data.get("title") or "tiktok_video"
-        author = "tiktok"
-        author_obj = data.get("author")
-        if isinstance(author_obj, dict):
-            author = author_obj.get("unique_id") or author_obj.get("nickname") or author
-        elif isinstance(author_obj, str) and author_obj:
-            author = author_obj
-
+        video = await self._get_video_info()
         is_audio_only = not download_video.video_format_id
         extension = ".mp3" if is_audio_only else ".mp4"
-        out_dir = Path(settings.DOWNLOAD_FOLDER) / remove_all_spec_chars(author)
+        out_dir = Path(settings.DOWNLOAD_FOLDER) / remove_all_spec_chars(video.author)
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"{task_id}_{remove_all_spec_chars(title)}{extension}"
+        out_path = out_dir / f"{task_id}_{remove_all_spec_chars(video.title)}{extension}"
 
         # choose source
-        source_url = audio_url if is_audio_only and audio_url else video_url
+        source_url = video.audio_url if is_audio_only and video.audio_url else video.video_url
         if not source_url:
             raise ValueError("TikTok: no suitable media stream")
 
         temp_path = out_path
-        if is_audio_only and audio_url is None:
+        if is_audio_only and video.audio_url is None:
             temp_path = out_path.with_suffix(".temp")
 
         task.filepath = temp_path
         task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
         await redis_cache.set_download_task(task_id, task)
 
-        async with aiohttp.ClientSession(headers={"User-Agent": TIKTOK_HEADERS["User-Agent"]}) as dl_sess:
+        async with aiohttp.ClientSession(headers={"User-Agent": self.api_headers["User-Agent"]}) as dl_sess:
             async with dl_sess.get(source_url) as r:
                 r.raise_for_status()
                 total = int(r.headers.get("Content-Length", 0))
@@ -162,7 +149,7 @@ class TikTokParser(BaseParser):
 
 
         # Convert to MP3 if needed
-        if is_audio_only and audio_url is None:
+        if is_audio_only and video.audio_url is None:
             task.video_status.description = "Converting to MP3"
             await redis_cache.set_download_task(task_id, task)
             await convert_to_mp3(temp_path.as_posix(), out_path.as_posix())

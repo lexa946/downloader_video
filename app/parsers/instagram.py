@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from bs4 import BeautifulSoup
 
 from app.config import settings
-from app.exceptions import DownloadUserCanceledException
 from app.models.cache import redis_cache
 from app.models.post_process import PostPrecess
 from app.models.status import VideoDownloadStatus
@@ -18,6 +17,7 @@ from app.parsers.base import BaseParser
 from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
 from app.utils.validators_utils import fallback_background_task
 from app.utils.video_utils import save_preview_on_s3, convert_to_mp3
+import re
 
 
 @dataclass
@@ -60,22 +60,26 @@ class InstagramVideo:
 class InstagramParser(BaseParser):
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 YaBrowser/25.6.0.0 Safari/537.36",
-    }
-    cookies = {
-        "csrftoken": settings.INSTAGRAM_CSRFTOKEN,
-        "sessionid": settings.INSTAGRAM_SESSIONID,
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Dest": "document",
+        "Upgrade-Insecure-Requests": "1",
     }
 
     def __init__(self, url):
         self.url = url
         self._response_text = None
+        # Use a separate header set when requesting media assets (add Referer)
+        self._asset_headers = dict(self.headers)
+        self._asset_headers["Referer"] = self.url
 
     @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
         async with aiohttp.ClientSession() as session:
-            async with session.get(self.url, headers=self.headers, cookies=self.cookies) as response:
+            async with session.get(self.url, headers=self.headers) as response:
                 response.raise_for_status()
                 response_text = await response.text()
 
@@ -84,7 +88,10 @@ class InstagramParser(BaseParser):
             download_path.parent.mkdir(parents=True, exist_ok=True)
 
             is_audio_only = not download_video.video_format_id
-            async with session.get(video.content_url, headers=self.headers, cookies=self.cookies) as response:
+
+            task.video_status.description = "Downloading video track" if not is_audio_only else "Downloading audio track"
+            await redis_cache.set_download_task(task_id, task)
+            async with session.get(video.content_url, headers=self._asset_headers) as response:
                 response.raise_for_status()
 
                 total_size = int(response.headers.get('Content-Length', 0))
@@ -93,10 +100,6 @@ class InstagramParser(BaseParser):
 
                 if is_audio_only:
                     temp_path = download_path.with_suffix('.temp')
-
-                task.filepath = temp_path
-                task.video_status.description = "Downloading video track" if not is_audio_only else "Downloading audio track"
-                await redis_cache.set_download_task(task_id, task)
 
                 async with aiofiles.open(temp_path, 'wb') as f:
                     while True:
@@ -107,8 +110,6 @@ class InstagramParser(BaseParser):
                         bytes_read += len(chunk)
                         task.video_status.percent = int((bytes_read / total_size) * 100)
                         await redis_cache.set_download_task(task_id, task)
-                        if await redis_cache.is_task_canceled(task_id):
-                            raise DownloadUserCanceledException()
 
                 if is_audio_only:
                     task.video_status.description = "Converting to MP3"
@@ -163,26 +164,81 @@ class InstagramParser(BaseParser):
                 if selected is None:
                     selected = tag
 
-        if selected is None:
-            # Fallback to previous heuristic
-            selected = next((t for t in scripts if ".mp4" in t.text), None)
-        if selected is None:
-            raise ValueError("Unable to find media info JSON")
+        # Attempt to parse via embedded JSON first
+        if selected is not None:
+            try:
+                json_ = json.loads(selected.text)
+                video = InstagramVideo.from_json(json_)
+                if shortcode:
+                    video.title = f"video_by_{video.author}_{shortcode}.mp4"
+                return video
+            except Exception:
+                pass
 
-        json_ = json.loads(selected.text)
-        video = InstagramVideo.from_json(json_)
-        # Make title unique to avoid collisions (also fixes preview key uniqueness)
+        # Fallback to OpenGraph meta tags (no cookies)
+        og_video = None
+        for prop in [
+            "meta[property='og:video:secure_url']",
+            "meta[property='og:video:url']",
+            "meta[property='og:video']",
+        ]:
+            tag = soup.select_one(prop)
+            if tag and tag.get("content"):
+                og_video = tag.get("content")
+                break
+
+        if not og_video:
+            raise ValueError("Unable to find media info JSON or og:video meta")
+
+        og_image = soup.select_one("meta[property='og:image']")
+        preview = og_image.get("content", "") if og_image else ""
+
+        og_desc = soup.select_one("meta[property='og:description']")
+        author = "instagram_user"
+        if og_desc and og_desc.get("content"):
+            m = re.search(r"@([A-Za-z0-9._]+)", og_desc.get("content", ""))
+            if m:
+                author = m.group(1)
+
+        width = soup.select_one("meta[property='og:video:width']")
+        height = soup.select_one("meta[property='og:video:height']")
+        try:
+            vw = int(width.get("content")) if width and width.get("content") else 0
+            vh = int(height.get("content")) if height and height.get("content") else 0
+        except Exception:
+            vw, vh = 0, 0
+        quality = f"{vw}x{vh}" if vw and vh else "unknown"
+
+        dur_tag = soup.select_one("meta[property='og:video:duration']")
+        try:
+            duration = int(dur_tag.get("content")) if dur_tag and dur_tag.get("content") else 0
+        except Exception:
+            duration = 0
+
+        title = f"video_by_{author}.mp4"
         if shortcode:
-            video.title = f"video_by_{video.author}_{shortcode}.mp4"
-        return video
+            title = f"video_by_{author}_{shortcode}.mp4"
+
+        return InstagramVideo(title, og_video, preview, duration, quality, 0, author)
 
     async def get_formats(self) -> SVideoResponse:
         async with aiohttp.ClientSession() as session:
-            async with session.get(self.url, headers=self.headers, cookies=self.cookies) as response:
+            async with session.get(self.url, headers=self.headers) as response:
                 response.raise_for_status()
                 response_text = await response.text()
 
         video = self._parse_video_attributes(response_text)
+
+        # Try to obtain filesize via HEAD if not parsed
+        if not video.size:
+            try:
+                async with aiohttp.ClientSession() as session2:
+                    async with session2.head(video.content_url, headers=self._asset_headers) as head_resp:
+                        clen = head_resp.headers.get('Content-Length') or head_resp.headers.get('content-length')
+                        if clen:
+                            video.size = int(clen)
+            except Exception:
+                pass
 
         preview_url = await save_preview_on_s3(video.preview_url, video.title,  video.author)
 

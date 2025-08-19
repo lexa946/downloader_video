@@ -77,7 +77,8 @@ class RedisCache:
             "filepath": str(task.filepath),
             "download": task.download.model_dump() if task.download else None,
         }
-        await self.redis.set(key, json.dumps(task_data), ex=self.ttl)
+        # Persist download task indefinitely (no TTL) so user history is always available
+        await self.redis.set(key, json.dumps(task_data))
         # Try to publish SSE update; ignore publish errors silently
         try:
             await self.publish_progress(task_id, task)
@@ -119,8 +120,23 @@ class RedisCache:
     async def add_user_task(self, user_id: str, task_id: str) -> None:
         """Add task ID to user's task list"""
         key = self._get_key(f"user:{user_id}")
+        # Pre-calculate which tasks will be trimmed out so we can clean their payloads
+        # Items at index >=5 BEFORE LPUSH will be removed AFTER LPUSH+LTRIM to 0..5
+        try:
+            to_remove = await self.redis.lrange(key, 5, -1)
+        except Exception:
+            to_remove = []
+
         await self.redis.lpush(key, task_id)
-        await self.redis.ltrim(key, 0, 5)  # Keep only last 6 tasks
+        await self.redis.ltrim(key, 0, 5)  # Keep only last 6 tasks (most recent first)
+
+        # Best-effort cleanup of trimmed tasks to avoid unbounded growth
+        for old_task_id in to_remove:
+            try:
+                await self.delete_download_task(old_task_id)
+            except Exception:
+                # Ignore cleanup errors
+                pass
 
     # --- Per-user active download lock ---
     async def get_user_active_task(self, user_id: str) -> Optional[str]:

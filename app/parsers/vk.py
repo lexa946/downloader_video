@@ -29,7 +29,6 @@ class VkVideo:
     content_sizes: dict[str, int]
     preview_url: str
     duration: int
-    size: int
 
     @classmethod
     def from_json(cls, json_: dict):
@@ -54,9 +53,7 @@ class VkVideo:
             video_preview_url = video_info.get('jpg', '')
             video_duration = video_info.get('duration', 0)
             
-            size = max(content_sizes.values()) if content_sizes else 0
-            
-            return cls(video_title, video_author, content_urls, content_sizes, video_preview_url, video_duration, size)
+            return cls(video_title, video_author, content_urls, content_sizes, video_preview_url, video_duration)
         except Exception as e:
             print(f"Error parsing VK video info: {e}")
             print(f"JSON structure: {json_}")
@@ -261,11 +258,10 @@ class VkParser(BaseParser):
                 file_sizes = await self._get_file_sizes(session, video.content_urls)
             
             video.content_sizes = file_sizes
-            video.size = max(file_sizes.values()) if file_sizes else 0
 
             available_formats = []
             for quality, url in video.content_urls.items():
-                filesize = video.content_sizes.get(quality, video.size)
+                filesize = video.content_sizes.get(quality)
                 available_formats.append(
                     SVideoFormat(
                         **{
@@ -284,7 +280,7 @@ class VkParser(BaseParser):
                         "quality": "Audio only",
                         "video_format_id": "",
                         "audio_format_id": min_quality,
-                        "filesize": video.content_sizes.get(min_quality, video.size) // 4,
+                        "filesize": video.content_sizes.get(min_quality),
                     }
                 )
             )

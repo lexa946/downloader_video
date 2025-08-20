@@ -4,7 +4,7 @@ from logging import getLogger
 from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Path, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Path, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from starlette import status
 import json
@@ -26,6 +26,7 @@ from app.schemas.main import (
 )
 from app.utils.validators_utils import check_task_id
 from app.utils.video_utils import stream_file
+from app.models.queue import task_queue
 
 router = APIRouter(prefix="/api", tags=["Service"])
 
@@ -127,8 +128,8 @@ async def start_download(request: Request, video_download: SVideoDownload,
             )
         await redis_cache.set_task_user(task_id, user_id)
 
-    service = VideoServicesManager.get_service(video_download.url)
-    background_tasks.add_task(service.parser(video_download.url).download, task_id, video_download)
+    arq = await task_queue.get()
+    await arq.enqueue_job("download_video", task_id, _job_id=task_id)
     return video_status
 
 
@@ -184,6 +185,42 @@ async def download_events(request: Request, task_id: Annotated[str, Path()]):
     )
 
 
+@router.websocket("/ws/download-events/{task_id}")
+async def ws_download_events(ws: WebSocket, task_id: Annotated[str, Path()]):
+    await ws.accept()
+    if not await redis_cache.exist_download_task(task_id):
+        await ws.close(code=4404)
+        return
+    channel = redis_cache.channel_for_task(task_id)
+    pubsub = redis_cache.redis.pubsub()
+    await pubsub.subscribe(channel)
+
+    try:
+        task = await redis_cache.get_download_task(task_id)
+        if task:
+            await ws.send_json({"task_id": task_id, **task.video_status.model_dump()})
+
+        async for msg in pubsub.listen():
+            if msg.get("type") != "message":
+                continue
+            data = msg.get("data")
+            await ws.send_text(data)
+            try:
+                payload = json.loads(data)
+                if payload.get("status") in ("completed", "error", "done", "canceled"):
+                    break
+            except Exception:
+                pass
+    except WebSocketDisconnect:
+        pass
+    finally:
+        with suppress(Exception):
+            await pubsub.unsubscribe(channel)
+            await pubsub.close()
+        with suppress(Exception):
+            await ws.close()
+
+
 @router.post("/cancel/{task_id}")
 @check_task_id
 async def cancel_download(task_id: Annotated[str, Path()]):
@@ -221,11 +258,25 @@ async def get_downloaded_video(task_id: Annotated[str, Path()]):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The file does not exist."
         )
-    filename = quote(task.filepath.stem.lstrip(task.id_))
+    original = task.filepath.stem
+    for prefix in (f"{task.id_}_video_", f"{task.id_}_audio_", f"{task.id_}_"):
+        if original.startswith(prefix):
+            original = original[len(prefix):]
+            break
+    try:    
+        import unicodedata
+        display_name = unicodedata.normalize('NFC', original)
+    except Exception:
+        display_name = original
+    if not display_name:
+        display_name = "video"
+    ascii_fallback = ''.join(ch if (ord(ch) < 128 and ch not in '\\/"\r\n') else '_' for ch in display_name)
+    ascii_fallback = ascii_fallback.replace('/', '_')
+    encoded_name = quote(display_name)
     extension = task.filepath.suffix
 
     headers = {
-        "Content-Disposition": f"attachment; filename={filename}{extension}",
+        "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}{extension}; filename=\"{ascii_fallback}{extension}\"",
         "Content-Length": str(task.filepath.stat().st_size),
         "Cache-Control": "no-cache",
         "Accept-Ranges": "bytes",

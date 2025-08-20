@@ -1,5 +1,4 @@
 from pathlib import Path
-import asyncio
 
 from fastapi import FastAPI, HTTPException
 from starlette.middleware.cors import CORSMiddleware
@@ -18,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.utils.jinja_filters import ru_date
 from app.models.cache import redis_cache
 from app.models.status import VideoDownloadStatus
-from app.models.services import VideoServicesManager
+from app.models.queue import task_queue
 from fastapi.templating import Jinja2Templates
 
 app = FastAPI()
@@ -95,9 +94,9 @@ async def on_startup():
                         elif active != task_id:
                             continue
                     try:
-                        service = VideoServicesManager.get_service(task.video_status.video.url)
-                        parser = service.parser(task.video_status.video.url)
-                        asyncio.create_task(parser.download(task_id, task.download))
+
+                        arq = await task_queue.get()
+                        await arq.enqueue_job("download_video", task_id, _job_id=task_id)
                     except Exception:
                         task.video_status.status = VideoDownloadStatus.ERROR
                         task.video_status.description = "Failed to resume after restart"

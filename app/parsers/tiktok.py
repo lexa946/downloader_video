@@ -1,5 +1,6 @@
 import aiohttp
 import aiofiles
+import time
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
@@ -133,15 +134,25 @@ class TikTokParser(BaseParser):
                 r.raise_for_status()
                 total = int(r.headers.get("Content-Length", 0))
                 read = 0
+                last_t = time.time()
+                last_bytes = 0
                 async with aiofiles.open(temp_path, "wb") as f:
                     async for chunk in r.content.iter_chunked(1024 * 64):
                         if not chunk:
                             break
                         await f.write(chunk)
                         read += len(chunk)
+                        now = time.time()
+                        dt = max(1e-3, now - last_t)
+                        speed = float(max(0, read - last_bytes)) / dt
+                        last_t = now
+                        last_bytes = read
                         if total:
                             task.video_status.percent = int(read / total * 100)
-                            await redis_cache.set_download_task(task)
+                            remain = max(0, total - read)
+                            task.video_status.speed_bps = speed
+                            task.video_status.eta_seconds = int(remain / speed) if speed > 0 else None
+                        await redis_cache.set_download_task(task)
                         if await redis_cache.is_task_canceled(task_id):
                             raise DownloadUserCanceledException()
 

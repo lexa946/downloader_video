@@ -323,6 +323,31 @@ class RutubeParser(BaseParser):
 
         def on_progress(seconds_done: float, percent: float):
             task.video_status.percent = float(percent)
+            try:
+                total = float(video.duration or 0)
+                if total > 0:
+                    remain = max(0.0, total - float(seconds_done or 0.0))
+                    # оценим суммарный битрейт по размеру файла, если он известен из вариантов
+                    est_total_size = 0
+                    try:
+                        v_bw = int(chosen_variant.get("video_bw") or 0)
+                        a_bw = 128000 if (not download_video.video_format_id) or ("audio" in chosen_variant) else 0
+                        if v_bw:
+                            est_total_size = int((v_bw + a_bw) / 8 * total)
+                    except Exception:
+                        est_total_size = 0
+                    if est_total_size and percent:
+                        bytes_done = est_total_size * (percent / 100.0)
+                        # скорость ~ bytes_done / seconds_done
+                        if seconds_done and seconds_done > 0:
+                            speed = bytes_done / seconds_done
+                            task.video_status.speed_bps = speed
+                            task.video_status.eta_seconds = int(remain * (est_total_size / bytes_done) * 0 + remain) if speed > 0 else int(remain)
+                    else:
+                        # если не знаем размер, оценим скорость по времени: скорость неизвестна, но ETA по времени
+                        task.video_status.eta_seconds = int(remain)
+            except Exception:
+                pass
             asyncio.run_coroutine_threadsafe(redis_cache.set_download_task(task), event_loop)
 
         is_cancel = False

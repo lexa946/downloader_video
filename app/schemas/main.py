@@ -38,6 +38,8 @@ class SVideoStatus(BaseModel):
     description: Optional[str] = field(default=None)
     percent: float = field(default=0)
     video: SVideoResponse
+    eta_seconds: Optional[int] = field(default=None)
+    speed_bps: Optional[float] = field(default=None)
 
 
 class SYoutubeSearchItem(BaseModel):

@@ -1,6 +1,7 @@
 import json
 import asyncio
 import aiofiles
+import time
 from pathlib import Path
 
 import aiohttp
@@ -96,6 +97,8 @@ class InstagramParser(BaseParser):
 
                 total_size = int(response.headers.get('Content-Length', 0))
                 bytes_read = 0
+                last_t = time.time()
+                last_bytes = 0
                 temp_path = download_path
 
                 if is_audio_only:
@@ -108,7 +111,16 @@ class InstagramParser(BaseParser):
                             break
                         await f.write(chunk)
                         bytes_read += len(chunk)
-                        task.video_status.percent = int((bytes_read / total_size) * 100)
+                        now = time.time()
+                        dt = max(1e-3, now - last_t)
+                        speed = float(max(0, bytes_read - last_bytes)) / dt  # bytes/sec
+                        last_t = now
+                        last_bytes = bytes_read
+                        if total_size:
+                            task.video_status.percent = int((bytes_read / total_size) * 100)
+                            remain = max(0, total_size - bytes_read)
+                            task.video_status.speed_bps = speed
+                            task.video_status.eta_seconds = int(remain / speed) if speed > 0 else None
                         await redis_cache.set_download_task(task)
 
                 if is_audio_only:

@@ -108,6 +108,22 @@ class VkParser(BaseParser):
                     async with self._lock:
                         self.bytes_read += len(chunk)
                         task.video_status.percent = int((self.bytes_read / self.total_size) * 100)
+                        # Оценка скорости и ETA по глобальному прогрессу
+                        # Для простоты: считаем среднюю скорость на весь файл через отношение прочитанных байт ко времени
+                        # Более точно можно считать по moving average, но достаточно и этого
+                        # Время берём из loop.time() сохранённого в начале
+                        try:
+                            if not hasattr(self, "_start_time"):
+                                import time
+                                self._start_time = time.time()
+                            import time
+                            elapsed = max(1e-3, time.time() - self._start_time)
+                            speed = float(self.bytes_read) / elapsed
+                            remain = max(0, self.total_size - self.bytes_read)
+                            task.video_status.speed_bps = speed
+                            task.video_status.eta_seconds = int(remain / speed) if speed > 0 else None
+                        except Exception:
+                            pass
                         await redis_cache.set_download_task(task)
                     await f.write(chunk)
                     if await redis_cache.is_task_canceled(task_id):

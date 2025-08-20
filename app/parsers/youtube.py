@@ -1,4 +1,5 @@
 import re
+import time
 import asyncio
 import aiohttp
 import json as _json
@@ -145,10 +146,24 @@ class YouTubeParser(BaseParser):
         task.filepath = download_path
         event_loop = asyncio.get_event_loop()
 
+        last_t = time.time()
+        last_bytes = 0
+
         def post_process_hook(stream_: Stream, chunk: bytes, bytes_remaining: int):
+            nonlocal last_t, last_bytes
             bytes_received = stream_.filesize - bytes_remaining
             percent = round(100.0 * bytes_received / float(stream_.filesize), 1)
+            now = time.time()
+            dt = max(1e-3, now - last_t)
+            speed = float(max(0.0, (bytes_received - last_bytes)) / dt)
+            remain = max(0, stream_.filesize - bytes_received)
+            eta = int(remain / max(1.0, speed)) if speed > 0 else None
+            last_t = now
+            last_bytes = bytes_received
+
             task.video_status.percent = float(percent)
+            task.video_status.speed_bps = speed
+            task.video_status.eta_seconds = eta
 
             async def _update_and_check():
                 await redis_cache.set_download_task(task)

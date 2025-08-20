@@ -18,7 +18,7 @@ from app.parsers.base import BaseParser
 from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
 from app.utils.helpers import remove_all_spec_chars
 from app.utils.validators_utils import fallback_background_task
-from app.utils.video_utils import convert_to_mp3, cut_media
+from app.utils.video_utils import convert_to_mp3
 
 
 @dataclass
@@ -33,19 +33,16 @@ class VkVideo:
     @classmethod
     def from_json(cls, json_: dict):
         try:
-            # Разные возможные структуры ответа от VK API
             if 'payload' in json_ and len(json_['payload']) > 1:
                 video_info = json_['payload'][1][4]['player']['params'][0]
             elif "params" in json_:
                 video_info = json_['params'][0]
             else:
-                # Альтернативная структура
                 video_info = json_
                 
             video_title = video_info.get('md_title', 'Без названия')
             video_author = video_info.get('md_author', 'Неизвестный автор')
-            
-            # Ищем доступные качества видео
+
             content_urls = {}
             for quality in (144, 240, 360, 480, 720, 1080):
                 url_key = f"url{quality}"
@@ -111,7 +108,7 @@ class VkParser(BaseParser):
                     async with self._lock:
                         self.bytes_read += len(chunk)
                         task.video_status.percent = int((self.bytes_read / self.total_size) * 100)
-                        await redis_cache.set_download_task(task_id, task)
+                        await redis_cache.set_download_task(task)
                     await f.write(chunk)
                     if await redis_cache.is_task_canceled(task_id):
                         raise DownloadUserCanceledException()
@@ -172,7 +169,7 @@ class VkParser(BaseParser):
             download_path.parent.mkdir(parents=True, exist_ok=True)
 
             task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
-            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.set_download_task(task)
 
             if is_audio_only:
                 content_url = video.content_urls[download_video.audio_format_id]
@@ -192,7 +189,7 @@ class VkParser(BaseParser):
                 ranges.append((start, end, i))
 
             task.filepath = download_path.parent / task_id
-            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.set_download_task(task)
             tasks = [
                 asyncio.create_task(
                     self._fetch_range(session, content_url, start, end, part_num, task_id, task, temp_path)
@@ -208,12 +205,12 @@ class VkParser(BaseParser):
                 raise
 
             task.video_status.description = "Merging parts"
-            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.set_download_task(task)
             await self._merge_parts(part_files, temp_path)
 
             if is_audio_only:
                 task.video_status.description = "Converting to MP3"
-                await redis_cache.set_download_task(task_id, task)
+                await redis_cache.set_download_task(task)
                 await asyncio.to_thread(convert_to_mp3,
                                     temp_path.as_posix(),
                                     download_path.as_posix()
@@ -228,7 +225,7 @@ class VkParser(BaseParser):
 
         task.video_status.status = VideoDownloadStatus.COMPLETED
         task.video_status.description = VideoDownloadStatus.COMPLETED
-        await redis_cache.set_download_task(task_id, task)
+        await redis_cache.set_download_task(task)
 
     async def get_formats(self) -> SVideoResponse:
         try:

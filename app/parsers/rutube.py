@@ -76,7 +76,6 @@ class RutubeParser(BaseParser):
         variants: Dict[str, Dict[str, str]] = {}
         lines = [line.strip() for line in master_text.splitlines() if line.strip()]
 
-        # Collect audio groups
         audio_groups: Dict[str, str] = {}
         audio_groups_default: Dict[str, str] = {}
 
@@ -268,7 +267,6 @@ class RutubeParser(BaseParser):
                 )
             )
 
-        # Audio only using the smallest variant as a source
         if video.variants:
             min_h = min(video.variants.keys(), key=lambda x: int(re.sub("[^0-9]", "", x)))
             available_formats.append(
@@ -319,13 +317,13 @@ class RutubeParser(BaseParser):
         temp_path = download_path.with_suffix(".temp.mp4") if is_audio_only else download_path
         task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
         task.filepath = temp_path
-        await redis_cache.set_download_task(task_id, task)
+        await redis_cache.set_download_task(task)
 
         event_loop = asyncio.get_running_loop()
 
         def on_progress(seconds_done: float, percent: float):
             task.video_status.percent = float(percent)
-            asyncio.run_coroutine_threadsafe(redis_cache.set_download_task(task_id, task), event_loop)
+            asyncio.run_coroutine_threadsafe(redis_cache.set_download_task(task), event_loop)
 
         is_cancel = False
         async def check_redis_cancel():
@@ -355,7 +353,7 @@ class RutubeParser(BaseParser):
 
         if is_audio_only:
             task.video_status.description = "Converting to MP3"
-            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.set_download_task(task)
             await asyncio.to_thread(
                 convert_to_mp3,
                 temp_path.as_posix(),
@@ -371,6 +369,6 @@ class RutubeParser(BaseParser):
 
         task.video_status.status = VideoDownloadStatus.COMPLETED
         task.video_status.description = VideoDownloadStatus.COMPLETED
-        await redis_cache.set_download_task(task_id, task)
+        await redis_cache.set_download_task(task)
 
 

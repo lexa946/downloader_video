@@ -40,7 +40,6 @@ class SVideoStatus(BaseModel):
     video: SVideoResponse
 
 
-# ---- YouTube Search Schemas ----
 class SYoutubeSearchItem(BaseModel):
     video_url: str
     title: str

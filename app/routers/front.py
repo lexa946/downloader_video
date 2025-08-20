@@ -1,79 +1,68 @@
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import FileResponse, HTMLResponse
+
+from app.utils.jinja_filters import ru_date
+from app.utils.validators_utils import get_user_id
 
 router = APIRouter(tags=["Фронт"])
 
 # Настройка путей
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 templates = Jinja2Templates(directory=str(FRONTEND_DIR))
-from app.utils.jinja_filters import ru_date
 templates.env.filters["ru_date"] = ru_date
 
 
-
-
 @router.get("/")
+@get_user_id
 async def index(request: Request):
     """Главная Страница"""
-    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
-    response = templates.TemplateResponse("parsers/index.html", context={"request": request, "user_id": user_id})
-    if "user_id" not in request.cookies:
-        response.set_cookie("user_id", user_id)
+    response = templates.TemplateResponse("parsers/index.html", context={"request": request})
     return response
 
 
-
 @router.get("/youtube-downloader", response_class=HTMLResponse)
+@get_user_id
 async def youtube_downloader(request: Request):
     """Страница YouTube Downloader"""
-    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
-    response = templates.TemplateResponse("parsers/youtube-downloader.html", context={"request": request, "user_id": user_id})
-    if "user_id" not in request.cookies:
-        response.set_cookie("user_id", user_id)
+    response = templates.TemplateResponse("parsers/youtube-downloader.html", context={"request": request})
     return response
 
 
 @router.get("/instagram-downloader", response_class=HTMLResponse)
+@get_user_id
 async def instagram_downloader(request: Request):
     """Страница Instagram Downloader"""
-    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
-    response = templates.TemplateResponse("parsers/instagram-downloader.html", context={"request": request, "user_id": user_id})
-    if "user_id" not in request.cookies:
-        response.set_cookie("user_id", user_id)
+    response = templates.TemplateResponse("parsers/instagram-downloader.html", context={"request": request})
     return response
 
 
 @router.get("/vk-downloader", response_class=HTMLResponse)
+@get_user_id
 async def vk_downloader(request: Request):
     """Страница VK Downloader"""
-    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
-    response = templates.TemplateResponse("parsers/vk-downloader.html", context={"request": request, "user_id": user_id})
-    if "user_id" not in request.cookies:
-        response.set_cookie("user_id", user_id)
+    response = templates.TemplateResponse("parsers/vk-downloader.html", context={"request": request})
     return response
 
+
 @router.get("/tiktok-downloader", response_class=HTMLResponse)
+@get_user_id
 async def tiktok_downloader(request: Request):
     """Страница TikTok Downloader"""
-    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
-    response = templates.TemplateResponse("parsers/tiktok-downloader.html", context={"request": request, "user_id": user_id})
-    if "user_id" not in request.cookies:
-        response.set_cookie("user_id", user_id)
+    response = templates.TemplateResponse("parsers/tiktok-downloader.html", context={"request": request})
     return response
 
 
 @router.get("/rutube-downloader", response_class=HTMLResponse)
+@get_user_id
 async def rutube_downloader(request: Request):
     """Страница RuTube Downloader"""
-    user_id = request.cookies.get("user_id", str(uuid.uuid4()))
-    response = templates.TemplateResponse("parsers/rutube-downloader.html", context={"request": request, "user_id": user_id})
-    if "user_id" not in request.cookies:
-        response.set_cookie("user_id", user_id)
+    response = templates.TemplateResponse("parsers/rutube-downloader.html", context={"request": request})
     return response
+
 
 @router.get("/faq", response_class=HTMLResponse)
 async def new_faq(request: Request):
@@ -119,4 +108,3 @@ async def yandex_verification():
     """Yandex верификация"""
     yandex_file = FRONTEND_DIR / "seo" / "yandex_c51849ff7e8fe28a.html"
     return FileResponse(yandex_file, media_type="text/html")
-

@@ -7,7 +7,6 @@ from sqlalchemy import (
     String,
     Text,
     DateTime,
-    Boolean,
     Index,
     text,
 )
@@ -54,5 +53,3 @@ class BlogPost(Base):
         Index("ix_blog_posts_status_published_at", "status", "published_at"),
         Index("ix_blog_posts_created_at", "created_at"),
     )
-
-

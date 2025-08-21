@@ -18,9 +18,7 @@ class PostPrecess:
     async def clip(self):
         if self.download_video.start_seconds is not None or self.download_video.end_seconds is not None:
             self.task.video_status.description = "Clipping selected fragment"
-            await redis_cache.set_download_task(
-                self.task.video_status.task_id, self.task
-            )
+            await redis_cache.set_download_task(self.task)
 
             clipped_path = self.task.filepath.with_name(self.task.filepath.stem + "_clip" + self.task.filepath.suffix)
             await asyncio.to_thread(

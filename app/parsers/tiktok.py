@@ -1,5 +1,6 @@
 import aiohttp
 import aiofiles
+import time
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
@@ -39,7 +40,6 @@ class TikTokParser(BaseParser):
         }
         self.api_url = f"https://www.tikwm.com/api/?url={self.url}&hd=1"
 
-
     async def _get_video_info(self):
         async with aiohttp.ClientSession(headers=self.api_headers) as session:
             async with session.get(self.api_url) as resp:
@@ -52,7 +52,7 @@ class TikTokParser(BaseParser):
         data = payload["data"]
         video_url: Optional[str] = data.get("hdplay") or data.get("wmplay") or data.get("play")
         audio_url: Optional[str] = data.get("music")
-        title: str = data.get("title", "tiktok_video") 
+        title: str = data.get("title", "tiktok_video")
         if len(title) > 50:
             title = title[:50] + "..."
         duration: int = int(data.get("duration", 0))
@@ -117,7 +117,6 @@ class TikTokParser(BaseParser):
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / f"{task_id}_{remove_all_spec_chars(video.title)}{extension}"
 
-        # choose source
         source_url = video.audio_url if is_audio_only and video.audio_url else video.video_url
         if not source_url:
             raise ValueError("TikTok: no suitable media stream")
@@ -128,30 +127,38 @@ class TikTokParser(BaseParser):
 
         task.filepath = temp_path
         task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
-        await redis_cache.set_download_task(task_id, task)
+        await redis_cache.set_download_task(task)
 
         async with aiohttp.ClientSession(headers={"User-Agent": self.api_headers["User-Agent"]}) as dl_sess:
             async with dl_sess.get(source_url) as r:
                 r.raise_for_status()
                 total = int(r.headers.get("Content-Length", 0))
                 read = 0
+                last_t = time.time()
+                last_bytes = 0
                 async with aiofiles.open(temp_path, "wb") as f:
                     async for chunk in r.content.iter_chunked(1024 * 64):
                         if not chunk:
                             break
                         await f.write(chunk)
                         read += len(chunk)
+                        now = time.time()
+                        dt = max(1e-3, now - last_t)
+                        speed = float(max(0, read - last_bytes)) / dt
+                        last_t = now
+                        last_bytes = read
                         if total:
                             task.video_status.percent = int(read / total * 100)
-                            await redis_cache.set_download_task(task_id, task)
+                            remain = max(0, total - read)
+                            task.video_status.speed_bps = speed
+                            task.video_status.eta_seconds = int(remain / speed) if speed > 0 else None
+                        await redis_cache.set_download_task(task)
                         if await redis_cache.is_task_canceled(task_id):
                             raise DownloadUserCanceledException()
 
-
-        # Convert to MP3 if needed
         if is_audio_only and video.audio_url is None:
             task.video_status.description = "Converting to MP3"
-            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.set_download_task(task)
             await convert_to_mp3(temp_path.as_posix(), out_path.as_posix())
             temp_path.unlink(missing_ok=True)
 
@@ -162,6 +169,4 @@ class TikTokParser(BaseParser):
 
         task.video_status.status = VideoDownloadStatus.COMPLETED
         task.video_status.description = VideoDownloadStatus.COMPLETED
-        await redis_cache.set_download_task(task_id, task)
-
-
+        await redis_cache.set_download_task(task)

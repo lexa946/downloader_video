@@ -40,7 +40,7 @@ async def stream_file(file_path: Path, task: DownloadTask, chunk_size: int = 102
         print(f"Video Utils: stream_file - {file_path} is deleted.")
         task.video_status.status = VideoDownloadStatus.DONE
         task.video_status.description = VideoDownloadStatus.DONE
-        await redis_cache.set_download_task(task_id, task)
+        await redis_cache.set_download_task(task)
 
 
 async def save_preview_on_s3(preview_url: str, key: str, folder: str = None) -> str:

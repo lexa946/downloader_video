@@ -1,6 +1,7 @@
 import json
 import asyncio
 import aiofiles
+import time
 from pathlib import Path
 
 import aiohttp
@@ -71,7 +72,7 @@ class InstagramParser(BaseParser):
     def __init__(self, url):
         self.url = url
         self._response_text = None
-        # Use a separate header set when requesting media assets (add Referer)
+
         self._asset_headers = dict(self.headers)
         self._asset_headers["Referer"] = self.url
 
@@ -90,12 +91,14 @@ class InstagramParser(BaseParser):
             is_audio_only = not download_video.video_format_id
 
             task.video_status.description = "Downloading video track" if not is_audio_only else "Downloading audio track"
-            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.set_download_task(task)
             async with session.get(video.content_url, headers=self._asset_headers) as response:
                 response.raise_for_status()
 
                 total_size = int(response.headers.get('Content-Length', 0))
                 bytes_read = 0
+                last_t = time.time()
+                last_bytes = 0
                 temp_path = download_path
 
                 if is_audio_only:
@@ -108,17 +111,26 @@ class InstagramParser(BaseParser):
                             break
                         await f.write(chunk)
                         bytes_read += len(chunk)
-                        task.video_status.percent = int((bytes_read / total_size) * 100)
-                        await redis_cache.set_download_task(task_id, task)
+                        now = time.time()
+                        dt = max(1e-3, now - last_t)
+                        speed = float(max(0, bytes_read - last_bytes)) / dt  # bytes/sec
+                        last_t = now
+                        last_bytes = bytes_read
+                        if total_size:
+                            task.video_status.percent = int((bytes_read / total_size) * 100)
+                            remain = max(0, total_size - bytes_read)
+                            task.video_status.speed_bps = speed
+                            task.video_status.eta_seconds = int(remain / speed) if speed > 0 else None
+                        await redis_cache.set_download_task(task)
 
                 if is_audio_only:
                     task.video_status.description = "Converting to MP3"
-                    await redis_cache.set_download_task(task_id, task)
+                    await redis_cache.set_download_task(task)
                     mp3_path = download_path.with_suffix('.mp3')
                     await asyncio.to_thread(convert_to_mp3,
-                                        temp_path.as_posix(),
-                                        mp3_path.as_posix()
-                                        )
+                                            temp_path.as_posix(),
+                                            mp3_path.as_posix()
+                                            )
                     temp_path.unlink(missing_ok=True)
                     task.filepath = mp3_path
                 else:
@@ -129,13 +141,12 @@ class InstagramParser(BaseParser):
 
         task.video_status.status = VideoDownloadStatus.COMPLETED
         task.video_status.description = VideoDownloadStatus.COMPLETED
-        await redis_cache.set_download_task(task_id, task)
+        await redis_cache.set_download_task(task)
 
     @staticmethod
     def _parse_video_attributes(content: str) -> InstagramVideo:
         soup = BeautifulSoup(content, features="lxml")
 
-        # Try to use canonical/og:url to extract current shortcode for disambiguation
         canonical_tag = soup.select_one("link[rel='canonical']")
         if canonical_tag and canonical_tag.get("href"):
             canonical_url = canonical_tag.get("href", "")
@@ -152,7 +163,6 @@ class InstagramParser(BaseParser):
                         shortcode = parts[i + 1]
                     break
 
-        # Prefer the JSON blob that contains the shortcode web info and matches the shortcode if available
         scripts = soup.select("script[type='application/json']")
         selected = None
         for tag in scripts:
@@ -164,7 +174,6 @@ class InstagramParser(BaseParser):
                 if selected is None:
                     selected = tag
 
-        # Attempt to parse via embedded JSON first
         if selected is not None:
             try:
                 json_ = json.loads(selected.text)
@@ -175,7 +184,6 @@ class InstagramParser(BaseParser):
             except Exception:
                 pass
 
-        # Fallback to OpenGraph meta tags (no cookies)
         og_video = None
         for prop in [
             "meta[property='og:video:secure_url']",
@@ -229,7 +237,6 @@ class InstagramParser(BaseParser):
 
         video = self._parse_video_attributes(response_text)
 
-        # Try to obtain filesize via HEAD if not parsed
         if not video.size:
             try:
                 async with aiohttp.ClientSession() as session2:
@@ -240,7 +247,7 @@ class InstagramParser(BaseParser):
             except Exception:
                 pass
 
-        preview_url = await save_preview_on_s3(video.preview_url, video.title,  video.author)
+        preview_url = await save_preview_on_s3(video.preview_url, video.title, video.author)
 
         available_formats = [
             SVideoFormat(

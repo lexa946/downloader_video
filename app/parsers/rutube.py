@@ -76,7 +76,6 @@ class RutubeParser(BaseParser):
         variants: Dict[str, Dict[str, str]] = {}
         lines = [line.strip() for line in master_text.splitlines() if line.strip()]
 
-        # Collect audio groups
         audio_groups: Dict[str, str] = {}
         audio_groups_default: Dict[str, str] = {}
 
@@ -268,7 +267,6 @@ class RutubeParser(BaseParser):
                 )
             )
 
-        # Audio only using the smallest variant as a source
         if video.variants:
             min_h = min(video.variants.keys(), key=lambda x: int(re.sub("[^0-9]", "", x)))
             available_formats.append(
@@ -319,13 +317,38 @@ class RutubeParser(BaseParser):
         temp_path = download_path.with_suffix(".temp.mp4") if is_audio_only else download_path
         task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
         task.filepath = temp_path
-        await redis_cache.set_download_task(task_id, task)
+        await redis_cache.set_download_task(task)
 
         event_loop = asyncio.get_running_loop()
 
         def on_progress(seconds_done: float, percent: float):
             task.video_status.percent = float(percent)
-            asyncio.run_coroutine_threadsafe(redis_cache.set_download_task(task_id, task), event_loop)
+            try:
+                total = float(video.duration or 0)
+                if total > 0:
+                    remain = max(0.0, total - float(seconds_done or 0.0))
+                    # оценим суммарный битрейт по размеру файла, если он известен из вариантов
+                    est_total_size = 0
+                    try:
+                        v_bw = int(chosen_variant.get("video_bw") or 0)
+                        a_bw = 128000 if (not download_video.video_format_id) or ("audio" in chosen_variant) else 0
+                        if v_bw:
+                            est_total_size = int((v_bw + a_bw) / 8 * total)
+                    except Exception:
+                        est_total_size = 0
+                    if est_total_size and percent:
+                        bytes_done = est_total_size * (percent / 100.0)
+                        # скорость ~ bytes_done / seconds_done
+                        if seconds_done and seconds_done > 0:
+                            speed = bytes_done / seconds_done
+                            task.video_status.speed_bps = speed
+                            task.video_status.eta_seconds = int(remain * (est_total_size / bytes_done) * 0 + remain) if speed > 0 else int(remain)
+                    else:
+                        # если не знаем размер, оценим скорость по времени: скорость неизвестна, но ETA по времени
+                        task.video_status.eta_seconds = int(remain)
+            except Exception:
+                pass
+            asyncio.run_coroutine_threadsafe(redis_cache.set_download_task(task), event_loop)
 
         is_cancel = False
         async def check_redis_cancel():
@@ -355,7 +378,7 @@ class RutubeParser(BaseParser):
 
         if is_audio_only:
             task.video_status.description = "Converting to MP3"
-            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.set_download_task(task)
             await asyncio.to_thread(
                 convert_to_mp3,
                 temp_path.as_posix(),
@@ -371,6 +394,6 @@ class RutubeParser(BaseParser):
 
         task.video_status.status = VideoDownloadStatus.COMPLETED
         task.video_status.description = VideoDownloadStatus.COMPLETED
-        await redis_cache.set_download_task(task_id, task)
+        await redis_cache.set_download_task(task)
 
 

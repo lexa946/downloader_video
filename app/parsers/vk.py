@@ -18,7 +18,7 @@ from app.parsers.base import BaseParser
 from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
 from app.utils.helpers import remove_all_spec_chars
 from app.utils.validators_utils import fallback_background_task
-from app.utils.video_utils import convert_to_mp3, cut_media
+from app.utils.video_utils import convert_to_mp3
 
 
 @dataclass
@@ -26,37 +26,34 @@ class VkVideo:
     title: str
     author: str
     content_urls: dict[str, str]
+    content_sizes: dict[str, int]
     preview_url: str
     duration: int
-    size: int
 
     @classmethod
     def from_json(cls, json_: dict):
         try:
-            # Разные возможные структуры ответа от VK API
             if 'payload' in json_ and len(json_['payload']) > 1:
                 video_info = json_['payload'][1][4]['player']['params'][0]
             elif "params" in json_:
                 video_info = json_['params'][0]
             else:
-                # Альтернативная структура
                 video_info = json_
-                
+            
             video_title = video_info.get('md_title', 'Без названия')
             video_author = video_info.get('md_author', 'Неизвестный автор')
-            
-            # Ищем доступные качества видео
             content_urls = {}
+            content_sizes = {}
             for quality in (144, 240, 360, 480, 720, 1080):
                 url_key = f"url{quality}"
                 if url_key in video_info and video_info[url_key]:
                     content_urls[str(quality)] = video_info[url_key]
+                    content_sizes[str(quality)] = 0
             
             video_preview_url = video_info.get('jpg', '')
             video_duration = video_info.get('duration', 0)
-            size = 0
             
-            return cls(video_title, video_author, content_urls, video_preview_url, video_duration, size)
+            return cls(video_title, video_author, content_urls, content_sizes, video_preview_url, video_duration)
         except Exception as e:
             print(f"Error parsing VK video info: {e}")
             print(f"JSON structure: {json_}")
@@ -111,7 +108,23 @@ class VkParser(BaseParser):
                     async with self._lock:
                         self.bytes_read += len(chunk)
                         task.video_status.percent = int((self.bytes_read / self.total_size) * 100)
-                        await redis_cache.set_download_task(task_id, task)
+                        # Оценка скорости и ETA по глобальному прогрессу
+                        # Для простоты: считаем среднюю скорость на весь файл через отношение прочитанных байт ко времени
+                        # Более точно можно считать по moving average, но достаточно и этого
+                        # Время берём из loop.time() сохранённого в начале
+                        try:
+                            if not hasattr(self, "_start_time"):
+                                import time
+                                self._start_time = time.time()
+                            import time
+                            elapsed = max(1e-3, time.time() - self._start_time)
+                            speed = float(self.bytes_read) / elapsed
+                            remain = max(0, self.total_size - self.bytes_read)
+                            task.video_status.speed_bps = speed
+                            task.video_status.eta_seconds = int(remain / speed) if speed > 0 else None
+                        except Exception:
+                            pass
+                        await redis_cache.set_download_task(task)
                     await f.write(chunk)
                     if await redis_cache.is_task_canceled(task_id):
                         raise DownloadUserCanceledException()
@@ -172,7 +185,7 @@ class VkParser(BaseParser):
             download_path.parent.mkdir(parents=True, exist_ok=True)
 
             task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
-            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.set_download_task(task)
 
             if is_audio_only:
                 content_url = video.content_urls[download_video.audio_format_id]
@@ -192,7 +205,7 @@ class VkParser(BaseParser):
                 ranges.append((start, end, i))
 
             task.filepath = download_path.parent / task_id
-            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.set_download_task(task)
             tasks = [
                 asyncio.create_task(
                     self._fetch_range(session, content_url, start, end, part_num, task_id, task, temp_path)
@@ -208,12 +221,12 @@ class VkParser(BaseParser):
                 raise
 
             task.video_status.description = "Merging parts"
-            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.set_download_task(task)
             await self._merge_parts(part_files, temp_path)
 
             if is_audio_only:
                 task.video_status.description = "Converting to MP3"
-                await redis_cache.set_download_task(task_id, task)
+                await redis_cache.set_download_task(task)
                 await asyncio.to_thread(convert_to_mp3,
                                     temp_path.as_posix(),
                                     download_path.as_posix()
@@ -228,35 +241,53 @@ class VkParser(BaseParser):
 
         task.video_status.status = VideoDownloadStatus.COMPLETED
         task.video_status.description = VideoDownloadStatus.COMPLETED
-        await redis_cache.set_download_task(task_id, task)
+        await redis_cache.set_download_task(task)
+
+    async def _get_file_sizes(self, session: aiohttp.ClientSession, content_urls: dict[str, str]) -> dict[str, int]:
+        sizes = {}
+        for quality, url in content_urls.items():
+            try:
+                async with session.head(url, ssl=self._ssl_context) as response:
+                    if response.status == 200:
+                        content_length = response.headers.get('Content-Length')
+                        if content_length:
+                            sizes[quality] = int(content_length)
+                        else:
+                            sizes[quality] = 0
+                    else:
+                        sizes[quality] = 0
+            except Exception as e:
+                sizes[quality] = 0
+        return sizes
 
     async def get_formats(self) -> SVideoResponse:
         try:
-            print(f"VK Parser: Starting get_formats for URL: {self.url}")
-            print(f"VK Parser: owner_id={self.owner_id}, video_id={self.video_id}")
-            
             async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context)) as session:
                 response_json = await self._get_video_info(session)
-                
-            print(f"VK Parser: Got response JSON keys: {list(response_json.keys()) if isinstance(response_json, dict) else 'Not a dict'}")
             
             video = VkVideo.from_json(response_json)
-            print(f"VK Parser: Parsed video - title: {video.title}, available qualities: {list(video.content_urls.keys())}")
 
             if not video.content_urls:
                 raise ValueError("No video URLs found in VK response")
 
-            available_formats = [
-                SVideoFormat(
-                    **{
-                        "quality": f"{quality}p",
-                        "video_format_id": quality,
-                        "audio_format_id": quality,
-                        "filesize": video.size,
-                    }
+            async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context)) as session:
+                file_sizes = await self._get_file_sizes(session, video.content_urls)
+            
+            video.content_sizes = file_sizes
+
+            available_formats = []
+            for quality, url in video.content_urls.items():
+                filesize = video.content_sizes.get(quality)
+                available_formats.append(
+                    SVideoFormat(
+                        **{
+                            "quality": f"{quality}p",
+                            "video_format_id": quality,
+                            "audio_format_id": quality,
+                            "filesize": filesize,
+                        }
+                    )
                 )
-                for quality, url in video.content_urls.items()
-            ]
 
             min_quality = min(video.content_urls.keys(), key=int)
             available_formats.append(
@@ -265,12 +296,10 @@ class VkParser(BaseParser):
                         "quality": "Audio only",
                         "video_format_id": "",
                         "audio_format_id": min_quality,
-                        "filesize": video.size // 4,
+                        "filesize": video.content_sizes.get(min_quality),
                     }
                 )
             )
-
-            print(f"VK Parser: Created {len(available_formats)} formats")
             
             return SVideoResponse(
                 url=self.url,

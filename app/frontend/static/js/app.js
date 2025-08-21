@@ -17,6 +17,8 @@ const videoThumbnail = document.getElementById('videoThumbnail');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
 const statusText = document.getElementById('statusText');
+const speedText = document.getElementById('speedText');
+const etaText = document.getElementById('etaText');
 const cancelBtn = document.getElementById('cancelBtn');
 
 // YouTube search elements
@@ -851,6 +853,44 @@ function updateProgressDisplay(statusData) {
                                 statusMessages[statusData.status] || 
                                 'Выполняется...';
     }
+
+    // speed/eta
+    if (speedText) {
+        const bps = statusData.speed_bps || 0;
+        if (bps > 0) {
+            speedText.textContent = `Скорость: ${formatSpeed(bps)}`;
+            speedText.style.display = 'block';
+        } else {
+            speedText.style.display = 'none';
+        }
+    }
+    if (etaText) {
+        const eta = statusData.eta_seconds;
+        if (typeof eta === 'number' && eta >= 0) {
+            etaText.textContent = `Осталось: ${formatEta(eta)}`;
+            etaText.style.display = 'block';
+        } else {
+            etaText.style.display = 'none';
+        }
+    }
+}
+
+function formatSpeed(bps) {
+    const units = ['Б/с', 'КБ/с', 'МБ/с', 'ГБ/с'];
+    let u = 0;
+    let v = bps;
+    while (v >= 1024 && u < units.length - 1) { v /= 1024; u++; }
+    return `${v.toFixed(1)} ${units[u]}`;
+}
+
+function formatEta(seconds) {
+    const s = Math.max(0, Math.floor(seconds));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}ч ${m.toString().padStart(2,'0')}м ${sec.toString().padStart(2,'0')}с`;
+    if (m > 0) return `${m}м ${sec.toString().padStart(2,'0')}с`;
+    return `${sec}с`;
 }
 
 async function cancelCurrentTask() {

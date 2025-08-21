@@ -1,10 +1,10 @@
+import uuid
 from functools import wraps
 import inspect
 from uuid import UUID
 from shutil import rmtree
 
-
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from starlette import status
 
 from app.exceptions import DownloadUserCanceledException
@@ -33,15 +33,27 @@ def fallback_background_task(func):
                             if file.stem.startswith(task.video_status.task_id):
                                 file.unlink(missing_ok=True)
 
-
             task.video_status.status = VideoDownloadStatus.CANCELED
             task.video_status.description = user_canceled.__doc__
-            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.set_download_task(task)
             await redis_cache.clear_task_canceled(task_id)
         except Exception as e:
             task.video_status.status = VideoDownloadStatus.ERROR
             task.video_status.description = str(e)
-            await redis_cache.set_download_task(task_id, task)
+            await redis_cache.set_download_task(task)
+
+    return wrapper
+
+
+def get_user_id(func):
+    @wraps(func)
+    async def wrapper(request, **kwargs):
+        user_id = request.cookies.get("user_id", str(uuid.uuid4()))
+        response = await func(request)
+        if "user_id" not in request.cookies:
+            response.set_cookie("user_id", user_id)
+        return response
+
     return wrapper
 
 
@@ -76,4 +88,5 @@ def check_task_id(func):
                 detail=f"Task with id {task_id} not found."
             )
         return await func(*args, **kwargs)
+
     return wrapper

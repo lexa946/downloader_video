@@ -19,7 +19,7 @@ services:
     volumes:
       - ./pg_data:/var/lib/postgresql/data
 
-  downloader_video_test:
+  downloader_video:
     restart: unless-stopped
     build:
       context: .
@@ -30,6 +30,26 @@ services:
     volumes:
       - ./.env:/.env:ro
       - ./app:/app:ro
+      - downloads:/downloads
+    environment:
+      - DOWNLOAD_FOLDER=/downloads
     depends_on:
       - redis
       - postgres
+
+  worker:
+    restart: unless-stopped
+    image: downloader_video:latest
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - ./.env:/.env:ro
+      - ./app:/app:ro
+      - downloads:/downloads
+    environment:
+      - DOWNLOAD_FOLDER=/downloads
+    command: ["python", "-m", "arq", "app.worker.WorkerSettings"]
+
+volumes:
+  downloads:

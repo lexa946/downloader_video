@@ -32,6 +32,27 @@ services:
     volumes:
       - ./.env:/.env:ro
       - ./app:/app:ro
+      - downloads_test:/downloads
+    environment:
+      - DOWNLOAD_FOLDER=/downloads
     depends_on:
       - redis
       - postgres
+
+  worker:
+    container_name: downloader_worker_test
+    restart: unless-stopped
+    image: downloader_video_test:latest
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - ./.env:/.env:ro
+      - ./app:/app:ro
+      - downloads_test:/downloads
+    environment:
+      - DOWNLOAD_FOLDER=/downloads
+    command: ["python", "-m", "arq", "app.worker.WorkerSettings"]
+
+volumes:
+  downloads_test:

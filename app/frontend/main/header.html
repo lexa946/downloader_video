@@ -1,5 +1,5 @@
 <header class="header">
-    <nav class="navbar nav-menu">
+    <nav class="navbar">
         <div class="nav-brand">
             <a href="/" class="brand-link">
                 <span class="brand-icon"><img src="/static/images/favicon.png"></span>
@@ -8,7 +8,14 @@
             <p class="brand-tagline">Скачать видео бесплатно онлайн</p>
         </div>
 
-        <div class="" id="navMenu">
+        <!-- Mobile hamburger button -->
+        <div class="nav-toggle" id="navToggle">
+            <span class="hamburger"></span>
+            <span class="hamburger"></span>
+            <span class="hamburger"></span>
+        </div>
+
+        <div class="nav-menu" id="navMenu">
             <ul class="nav-list">
                 <li class="nav-item">
                     <a href="/" class="nav-link">Главная</a>
@@ -72,8 +79,10 @@
                 {% endif %}
             </ul>
         </div>
+        <div class="nav-backdrop" id="navBackdrop"></div>
     </nav>
 </header>
 <script src="/static/js/setActiveNavigator.js"></script>
 <script src="/static/js/dropdown.js"></script>
+<script src="/static/js/mobile-nav.js"></script>
 <script>setActiveNavigation()</script>

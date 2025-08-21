@@ -46,12 +46,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         document.addEventListener('click', function(e) {
-            if (!navToggle.contains(e.target) && !navMenu.contains(e.target)) {
-                navToggle.classList.remove('active');
-                navMenu.classList.remove('active');
-                if (navBackdrop) navBackdrop.classList.remove('active');
-                navMenu.style.display = 'none';
-                setBodyScrollLocked(false);
+            // Закрываем только на мобильной ширине
+            if (window.innerWidth <= 768) {
+                if (!navToggle.contains(e.target) && !navMenu.contains(e.target)) {
+                    navToggle.classList.remove('active');
+                    navMenu.classList.remove('active');
+                    if (navBackdrop) navBackdrop.classList.remove('active');
+                    navMenu.style.display = 'none';
+                    setBodyScrollLocked(false);
+                }
             }
         });
         

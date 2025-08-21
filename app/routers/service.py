@@ -115,7 +115,8 @@ async def start_download(request: Request, video_download: SVideoDownload,
     video_status = SVideoStatus(
         task_id=task_id,
         status=VideoDownloadStatus.PENDING,
-        video=video_meta or EMPTY_VIDEO_RESPONSE
+        video=video_meta or EMPTY_VIDEO_RESPONSE,
+        created_at=__import__('time').time()
     )
     await redis_cache.set_download_task(DownloadTask(video_status, download=video_download))
     await redis_cache.add_user_task(user_id, task_id)
@@ -127,6 +128,12 @@ async def start_download(request: Request, video_download: SVideoDownload,
                 detail="У вас уже есть активная загрузка. Дождитесь завершения текущей загрузки."
             )
         await redis_cache.set_task_user(task_id, user_id)
+        # мониторинг активности пользователя
+        try:
+            await redis_cache.set_user_activity(user_id)
+            await redis_cache.set_user_last_task(user_id, task_id)
+        except Exception:
+            pass
 
     arq = await task_queue.get()
     await arq.enqueue_job("download_video", task_id, _job_id=task_id)

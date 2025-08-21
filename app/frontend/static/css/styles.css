@@ -30,6 +30,8 @@ body {
     align-items: center;
     flex-wrap: wrap;
     gap: 20px;
+    position: relative; /* ensure z-index works */
+    z-index: 2000;
 }
 
 .nav-brand {
@@ -226,7 +228,7 @@ body {
     visibility: hidden;
     transform: translateY(-10px);
     transition: all 0.3s ease;
-    z-index: 1000;
+    z-index: 3000; /* above sticky table headers */
 }
 
 .dropdown.active .dropdown-menu {

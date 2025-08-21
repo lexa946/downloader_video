@@ -24,10 +24,32 @@
 }
 
 .table { width: 100%; border-collapse: collapse; margin-bottom: 5%;}
-.table th, .table td { padding: 12px 14px; border-bottom: 1px solid #e9ecef; text-align: left; vertical-align: top; }
-.table th { background: #f8f9fa; color: #495057; font-weight: 600; position: sticky; top: 0; }
+.table th, .table td { padding: 12px 14px; border-bottom: 1px solid #e9ecef; text-align: left; vertical-align: middle; }
+.table th { background: #f8f9fa; color: #495057; font-weight: 600; position: sticky; top: 0; z-index: 100; }
 .table thead th:first-child{border-radius: 20px 0 0 0;}
 .table thead th:last-child{border-radius: 0 20px 0 0; text-align: end}
+
+/* Filter icon & popover */
+.filter-icon { background: transparent; border: none; padding: 0 6px; cursor: pointer; vertical-align: middle; }
+.filter-icon svg { width: 16px; height: 16px; fill: #3498db; }
+.filter-clear { background: transparent; border: none; padding: 0 4px; cursor: pointer; vertical-align: middle; }
+.filter-clear svg { width: 14px; height: 14px; fill: #e74c3c; }
+.filter-popover { position: absolute; top: 36px; left: 0; background: #fff; border: 1px solid #dee2e6; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); padding: 10px; min-width: 260px; display: none; z-index: 6000; }
+.filter-popover.active { display: block; }
+.filter-header { font-weight: 700; color: #2c3e50; margin-bottom: 8px; }
+.filter-body { padding: 6px 0; }
+.filter-option { display: block; margin: 6px 0; }
+.filter-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.filter-input { padding: 8px 10px; border:1px solid #dee2e6; border-radius:8px; }
+.preset { background:#eef2f7; border:1px solid #dee2e6; border-radius:8px; padding:6px 8px; cursor:pointer; }
+.preset:hover { background:#e6ebf2; }
+
+/* raise z-index for TH when its filter is open so it stacks above neighbors */
+.table thead th.filter-open { z-index: 5500; }
+
+/* Align table headers content in one line (use inner wrapper to avoid breaking table layout) */
+.table thead th .th-inner { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.table thead th .th-text { line-height: 1; }
 
 .table td.actions { display: flex; justify-content: end}
 
@@ -35,6 +57,8 @@
 .status-draft { background: #fff3cd; color: #856404; }
 .status-published { background: #d4edda; color: #155724; }
 .status-archived { background: #e2e3e5; color: #383d41; }
+/* explicit error state (red) */
+.status-error { background: #f8d7da; color: #721c24; }
 
 .btn-link { background: none; border: none; color: #3498db; cursor: pointer; padding: 0; font-weight: 600; }
 .btn-link.danger { color: #e74c3c; }

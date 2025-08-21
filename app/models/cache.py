@@ -1,5 +1,6 @@
 import json
 from typing import Optional, Dict, List
+from datetime import datetime, timezone
 from redis.asyncio import Redis
 
 from app.config import settings
@@ -111,6 +112,44 @@ class RedisCache:
                 await self.delete_download_task(old_task_id)
             except Exception:
                 pass
+
+    async def list_users(self) -> List[str]:
+        """Return list of user_ids that have any tasks recorded."""
+        users: List[str] = []
+        pattern = self._get_key("user:*")
+        async for key in self.redis.scan_iter(pattern):
+            # key format: <prefix>user:<user_id>
+            try:
+                user_id = key.split(":")[-1]
+                users.append(user_id)
+            except Exception:
+                continue
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_users: List[str] = []
+        for uid in users:
+            if uid not in seen:
+                seen.add(uid)
+                unique_users.append(uid)
+        return unique_users
+
+    async def set_user_activity(self, user_id: str) -> None:
+        """Record last activity timestamp (UTC ISO) for user."""
+        key = self._get_key(f"activity:{user_id}")
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await self.redis.set(key, now_iso)
+
+    async def get_user_activity(self, user_id: str) -> Optional[str]:
+        key = self._get_key(f"activity:{user_id}")
+        return await self.redis.get(key)
+
+    async def set_user_last_task(self, user_id: str, task_id: str) -> None:
+        key = self._get_key(f"last_task:{user_id}")
+        await self.redis.set(key, task_id)
+
+    async def get_user_last_task(self, user_id: str) -> Optional[str]:
+        key = self._get_key(f"last_task:{user_id}")
+        return await self.redis.get(key)
 
     async def get_user_active_task(self, user_id: str) -> Optional[str]:
         """Return currently active task_id for user if exists."""

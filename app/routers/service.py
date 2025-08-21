@@ -185,42 +185,6 @@ async def download_events(request: Request, task_id: Annotated[str, Path()]):
     )
 
 
-@router.websocket("/ws/download-events/{task_id}")
-async def ws_download_events(ws: WebSocket, task_id: Annotated[str, Path()]):
-    await ws.accept()
-    if not await redis_cache.exist_download_task(task_id):
-        await ws.close(code=4404)
-        return
-    channel = redis_cache.channel_for_task(task_id)
-    pubsub = redis_cache.redis.pubsub()
-    await pubsub.subscribe(channel)
-
-    try:
-        task = await redis_cache.get_download_task(task_id)
-        if task:
-            await ws.send_json({"task_id": task_id, **task.video_status.model_dump()})
-
-        async for msg in pubsub.listen():
-            if msg.get("type") != "message":
-                continue
-            data = msg.get("data")
-            await ws.send_text(data)
-            try:
-                payload = json.loads(data)
-                if payload.get("status") in ("completed", "error", "done", "canceled"):
-                    break
-            except Exception:
-                pass
-    except WebSocketDisconnect:
-        pass
-    finally:
-        with suppress(Exception):
-            await pubsub.unsubscribe(channel)
-            await pubsub.close()
-        with suppress(Exception):
-            await ws.close()
-
-
 @router.post("/cancel/{task_id}")
 @check_task_id
 async def cancel_download(task_id: Annotated[str, Path()]):

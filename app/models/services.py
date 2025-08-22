@@ -28,7 +28,7 @@ class InstagramVideoService(VideoServiceBase):
 
 class VkVideoService(VideoServiceBase):
     name = "VK"
-    key_words = ['vkvideo', 'vk.com/video', 'vk.com/club']
+    key_words = ['vkvideo', 'vk.com/video', 'vk.com/club', 'vk.com/clip']
     parser = VkParser
 
 

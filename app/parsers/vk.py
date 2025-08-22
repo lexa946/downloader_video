@@ -68,7 +68,7 @@ class VkParser(BaseParser):
     def __init__(self, url):
 
         self.url = url
-        self.owner_id, self.video_id = re.search(r"video-?(\d+_\d+)", self.url).group(1).split("_")
+        self.owner_id, self.video_id = re.search(r"(video|clip)-?(\d+_\d+)", self.url).group(2).split("_")
         self.access_token = None
         self.bytes_read = 0
         self.total_size = 0

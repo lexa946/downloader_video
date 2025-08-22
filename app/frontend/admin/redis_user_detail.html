@@ -1,0 +1,120 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Админка — Пользователь {{ user_id }}{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="/static/css/admin.css">
+  <script>
+    function timeAgoTs(ts){
+      if(!ts) return '-';
+      const d = new Date(ts * 1000);
+      const now = new Date();
+      const diff = Math.floor((now - d)/1000);
+      if(diff < 60) return diff + ' сек назад';
+      if(diff < 3600) return Math.floor(diff/60) + ' мин назад';
+      if(diff < 86400) return Math.floor(diff/3600) + ' ч назад';
+      return Math.floor(diff/86400) + ' д назад';
+    }
+    document.addEventListener('DOMContentLoaded', ()=>{
+      document.querySelectorAll('.js-relative-ago').forEach(el=>{ el.textContent = timeAgoTs(parseFloat(el.getAttribute('data-ts'))); });
+    });
+  </script>
+{% endblock %}
+
+{% block content %}
+<div class="main">
+  <div class="container">
+    <div class="admin-toolbar">
+      <h1 class="admin-title">Пользователь: {{ user_id }}</h1>
+      <a class="cta-button" href="/admin/redis/users">← К списку</a>
+    </div>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-header">
+          <h3>Состояние</h3>
+        </div>
+        <div class="card-body">
+          <p><strong>Последняя активность:</strong>
+            {% if last_activity_ts %}
+              <span class="js-relative-ago" data-ts="{{ last_activity_ts }}"></span>
+            {% else %}
+              <span>-</span>
+            {% endif %}
+          </p>
+          <p>
+            <strong>Активная загрузка:</strong>
+            {% if active_task %}
+              <span class="status-pill status-published">да</span>
+            {% else %}
+              <span class="status-pill status-draft">нет</span>
+            {% endif %}
+          </p>
+        </div>
+      </div>
+
+      {% if active_task %}
+      <div class="card">
+        <div class="card-header">
+          <h3>Текущая задача</h3>
+        </div>
+        <div class="card-body">
+          <p><strong>Task ID:</strong> {{ active_task.video_status.task_id }}</p>
+          <p><strong>Статус:</strong> {{ active_task.video_status.status }}</p>
+          <p><strong>Прогресс:</strong> {{ '%.0f'|format(active_task.video_status.percent) }}%</p>
+          <p><strong>Название:</strong> {{ active_task.video_status.video.title }}</p>
+          <p><strong>URL:</strong> <a href="{{ active_task.video_status.video.url }}" target="_blank" rel="noopener">{{ active_task.video_status.video.url }}</a></p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>История задач</h3>
+      </div>
+      <div class="card-body">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Task ID</th>
+              <th>Статус</th>
+              <th>Прогресс</th>
+              <th>Тайтл</th>
+              <th>Создано</th>
+              <th>Ссылка</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tasks %}
+            <tr>
+              <td>{{ t.video_status.task_id }}</td>
+              <td>
+                {% set s = (t.video_status.status or '')|lower %}
+                {% if s in ['completed', 'done'] %}
+                  <span class="status-pill status-published">{{ s }}</span>
+                {% elif s in ['pending'] %}
+                  <span class="status-pill status-draft">{{ s }}</span>
+                {% elif s in ['error', 'canceled', 'cancelled'] %}
+                  <span class="status-pill status-error">{{ s }}</span>
+                {% else %}
+                  <span class="status-pill status-archived">{{ s }}</span>
+                {% endif %}
+              </td>
+              <td>{{ '%.0f'|format(t.video_status.percent) }}%</td>
+              <td>{{ t.video_status.video.title }}</td>
+              <td>{{ t.created_at_str or '-' }}</td>
+              <td>
+                <a class="icon-btn" href="{{ t.video_status.video.url }}" target="_blank" rel="noopener" title="Открыть" aria-label="Открыть">
+                  <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

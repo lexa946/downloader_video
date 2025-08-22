@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status, UploadFile, File
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status, UploadFile, File, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from passlib.hash import bcrypt
@@ -15,6 +15,7 @@ from app.database import get_db
 from app.models.admin_user import AdminUser
 from app.models.blog import BlogPost, PostStatus
 from app.schemas.blog import SPostCreate, SPostUpdate
+from app.models.cache import redis_cache
 from app.s3.client import s3_client
 import io
 
@@ -65,6 +66,115 @@ async def login(
 async def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/admin/login", status_code=302)
+
+
+# ================== REDIS MONITORING ==================
+@router.get("/redis/users", response_class=HTMLResponse)
+async def redis_users(
+    request: Request,
+    active: int | None = Query(default=None, description="1=только активные, 0=только неактивные"),
+    last_hours: int | None = Query(default=None, description="Показывать активных за последние N часов"),
+    sort: str | None = Query(default=None, description="user|active|last|title"),
+    dir: str | None = Query(default=None, description="asc|desc"),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    users = await redis_cache.list_users()
+    rows_all = []
+    for uid in users:
+        active_task = await redis_cache.get_user_active_task(uid)
+        # берем самую свежую задачу как индикатор последней активности
+        task_ids = await redis_cache.get_user_tasks(uid)
+        last_task_id = task_ids[0] if task_ids else None
+        last_task = await redis_cache.get_download_task(last_task_id) if last_task_id else None
+        last_activity_ts = None
+        if last_task and getattr(last_task.video_status, "created_at", None):
+            try:
+                last_activity_ts = float(last_task.video_status.created_at)
+            except Exception:
+                last_activity_ts = None
+        rows_all.append({
+            "user_id": uid,
+            "active_task": active_task,
+            "last_activity_ts": last_activity_ts,
+            "last_title": (last_task.video_status.video.title if last_task else None),
+            "last_url": (last_task.video_status.video.url if last_task else None),
+            "last_status": (last_task.video_status.status if last_task else None),
+        })
+    # Глобальный счётчик активных пользователей
+    active_count = sum(1 for r in rows_all if r["active_task"])
+
+    # Фильтрация
+    rows = rows_all
+    if active is not None:
+        want_active = bool(active)
+        rows = [r for r in rows if bool(r["active_task"]) == want_active]
+    if last_hours is not None and last_hours >= 0:
+        import time as _time
+        threshold = _time.time() - (last_hours * 3600)
+        rows = [r for r in rows if (r["last_activity_ts"] or 0) >= threshold]
+
+    # Сортировка
+    allowed_sorts = {"user", "active", "last"}
+    if sort not in allowed_sorts:
+        sort = None
+    reverse = (dir == "desc") if dir in {"asc", "desc"} else True
+    if sort:
+        if sort == "user":
+            rows.sort(key=lambda r: r["user_id"] or "", reverse=reverse)
+        elif sort == "active":
+            rows.sort(key=lambda r: 1 if r["active_task"] else 0, reverse=reverse)
+        elif sort == "last":
+            rows.sort(key=lambda r: float(r["last_activity_ts"] or 0.0), reverse=reverse)
+        # title sorting removed with column
+
+    rows_count = len(rows)
+
+    return templates.TemplateResponse(
+        "admin/redis_users.html",
+        {
+            "request": request,
+            "rows": rows,
+            "active_count": active_count,
+            "rows_count": rows_count,
+            "filter_active": active,
+            "filter_last_hours": last_hours,
+            "sort_key": sort,
+            "sort_dir": (dir if dir in {"asc", "desc"} else None),
+        },
+    )
+
+
+@router.get("/redis/users/{user_id}", response_class=HTMLResponse)
+async def redis_user_detail(user_id: str, request: Request, admin: AdminUser = Depends(get_current_admin)):
+    active_task_id = await redis_cache.get_user_active_task(user_id)
+    active_task = await redis_cache.get_download_task(active_task_id) if active_task_id else None
+    task_ids = await redis_cache.get_user_tasks(user_id)
+    tasks = []
+    for tid in task_ids:
+        t = await redis_cache.get_download_task(tid)
+        if t:
+            try:
+                ts = float(getattr(t.video_status, "created_at", 0) or 0)
+                t.created_at_str = datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[attr-defined]
+            except Exception:
+                t.created_at_str = ""  # type: ignore[attr-defined]
+            tasks.append(t)
+    last_activity = None
+    if tasks:
+        try:
+            last_activity = float(getattr(tasks[0].video_status, "created_at", 0) or 0)
+        except Exception:
+            last_activity = None
+    return templates.TemplateResponse(
+        "admin/redis_user_detail.html",
+        {
+            "request": request,
+            "user_id": user_id,
+            "active_task": active_task,
+            "tasks": tasks,
+            "last_activity_ts": last_activity,
+        },
+    )
 
 
 @router.get("/posts", response_class=HTMLResponse)

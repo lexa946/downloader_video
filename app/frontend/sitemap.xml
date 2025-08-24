@@ -90,4 +90,12 @@
     <priority>0.7</priority>
   </url>
 
+  <!-- Статья о скачивании с RuTube -->
+  <url>
+    <loc>https://downloader.pozharsite.ru/blog/kak-skachat-video-s-rutube-bez-programm-polnoe-rukovodstvo</loc>
+    <lastmod>2025-08-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
 </urlset>

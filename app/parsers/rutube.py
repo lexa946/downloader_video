@@ -1,4 +1,5 @@
 import asyncio
+import time
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -336,16 +337,29 @@ class RutubeParser(BaseParser):
                             est_total_size = int((v_bw + a_bw) / 8 * total)
                     except Exception:
                         est_total_size = 0
+                    # Реальная скорость по дельте байт/времени, а не по медиасекундам
+                    if not hasattr(on_progress, "_last_t"):
+                        on_progress._last_t = time.time()
+                        on_progress._last_bytes = 0.0
+
                     if est_total_size and percent:
-                        bytes_done = est_total_size * (percent / 100.0)
-                        # скорость ~ bytes_done / seconds_done
-                        if seconds_done and seconds_done > 0:
-                            speed = bytes_done / seconds_done
-                            task.video_status.speed_bps = speed
-                            task.video_status.eta_seconds = int(remain * (est_total_size / bytes_done) * 0 + remain) if speed > 0 else int(remain)
+                        bytes_done = float(est_total_size) * (float(percent) / 100.0)
+                        now = time.time()
+                        dt = max(1e-3, now - on_progress._last_t)
+                        delta_bytes = max(0.0, bytes_done - on_progress._last_bytes)
+                        speed = float(delta_bytes) / dt if dt > 0 else 0.0
+                        task.video_status.speed_bps = speed if speed > 0 else None
+                        if est_total_size and speed > 0:
+                            remain_bytes = max(0.0, float(est_total_size) - bytes_done)
+                            task.video_status.eta_seconds = int(remain_bytes / speed)
+                        else:
+                            task.video_status.eta_seconds = None
+                        on_progress._last_t = now
+                        on_progress._last_bytes = bytes_done
                     else:
-                        # если не знаем размер, оценим скорость по времени: скорость неизвестна, но ETA по времени
-                        task.video_status.eta_seconds = int(remain)
+                        # Не знаем общий размер — не показываем скорость/ETA
+                        task.video_status.speed_bps = None
+                        task.video_status.eta_seconds = None
             except Exception:
                 pass
             asyncio.run_coroutine_threadsafe(redis_cache.set_download_task(task), event_loop)

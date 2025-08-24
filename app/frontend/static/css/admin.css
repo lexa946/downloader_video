@@ -125,3 +125,99 @@
 .icon-btn.warning svg { fill: #f1c40f; }
 .icon-btn.danger svg { fill: #e74c3c; }
 
+/* Mobile responsive styles for tables */
+@media (max-width: 768px) {
+  .admin-toolbar {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .admin-title {
+    font-size: 1.4rem;
+  }
+  
+  /* Make table responsive with horizontal scroll */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  .table {
+    min-width: 600px; /* Ensure minimum width for readability */
+    margin-bottom: 20px;
+  }
+  
+  .table th, .table td {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+  }
+  
+  .table th {
+    white-space: nowrap;
+    font-size: 0.85rem;
+  }
+  
+  /* Adjust filter popovers for mobile */
+  .filter-popover {
+    min-width: 200px;
+    max-width: 90vw;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  /* Make status pills smaller on mobile */
+  .status-pill {
+    padding: 3px 8px;
+    font-size: 0.8rem;
+  }
+  
+  /* Adjust icon buttons for mobile */
+  .icon-btn {
+    padding: 6px;
+  }
+  
+  .icon-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  /* Make modal more mobile-friendly */
+  .modal {
+    margin: 20px;
+    padding: 16px;
+  }
+  
+  .modal .modal-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .modal .btn {
+    width: 100%;
+    padding: 12px;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .table {
+    min-width: 500px;
+  }
+  
+  .table th, .table td {
+    padding: 6px 8px;
+    font-size: 0.85rem;
+  }
+  
+  .admin-title {
+    font-size: 1.2rem;
+  }
+  
+  .filter-popover {
+    min-width: 180px;
+  }
+}
+

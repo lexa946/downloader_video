@@ -112,92 +112,94 @@
         <span class="status-pill status-published">Строк: {{ rows_count }}</span>
       </div>
     </div>
-    <table class="table">
-      <thead>
-        <tr>
-          <th style="position:relative;"><span class="th-inner"><span class="th-text">User ID</span>
-            <button class="filter-icon sort-trigger" data-sort="user" title="Сортировка">
-              <svg viewBox="0 0 24 24"><path d="M7 10l5-5 5 5H7zm10 4l-5 5-5-5h10z"/></svg>
-            </button></span>
-          </th>
-          <th style="position:relative;"><span class="th-inner"><span class="th-text">Активная загрузка</span>
-            <button class="filter-icon" data-filter="active" title="Фильтр">
-              <svg viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>
-            </button>
-            {% if filter_active is not none %}
-            <button class="filter-clear" data-clear="active" title="Сбросить">
-              <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12.01l6.3 6.29-1.41 1.41L10.59 13.4 4.3 19.71 2.89 18.3 9.18 12 2.89 5.71 4.3 4.3l6.29 6.29 6.3-6.29z"/></svg>
-            </button>
-            {% endif %}</span>
-            <div class="filter-popover" data-popover="active">
-              <div class="filter-header">Фильтр по активности</div>
-              <div class="filter-body">
-                <label class="filter-option"><input type="radio" name="active" value="" {% if filter_active is none %}checked{% endif %}/> Все</label>
-                <label class="filter-option"><input type="radio" name="active" value="1" {% if filter_active==1 %}checked{% endif %}/> Только активные</label>
-                <label class="filter-option"><input type="radio" name="active" value="0" {% if filter_active==0 %}checked{% endif %}/> Только неактивные</label>
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="position:relative;"><span class="th-inner"><span class="th-text">User ID</span>
+              <button class="filter-icon sort-trigger" data-sort="user" title="Сортировка">
+                <svg viewBox="0 0 24 24"><path d="M7 10l5-5 5 5H7zm10 4l-5 5-5-5h10z"/></svg>
+              </button></span>
+            </th>
+            <th style="position:relative;"><span class="th-inner"><span class="th-text">Активная загрузка</span>
+              <button class="filter-icon" data-filter="active" title="Фильтр">
+                <svg viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>
+              </button>
+              {% if filter_active is not none %}
+              <button class="filter-clear" data-clear="active" title="Сбросить">
+                <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12.01l6.3 6.29-1.41 1.41L10.59 13.4 4.3 19.71 2.89 18.3 9.18 12 2.89 5.71 4.3 4.3l6.29 6.29 6.3-6.29z"/></svg>
+              </button>
+              {% endif %}</span>
+              <div class="filter-popover" data-popover="active">
+                <div class="filter-header">Фильтр по активности</div>
+                <div class="filter-body">
+                  <label class="filter-option"><input type="radio" name="active" value="" {% if filter_active is none %}checked{% endif %}/> Все</label>
+                  <label class="filter-option"><input type="radio" name="active" value="1" {% if filter_active==1 %}checked{% endif %}/> Только активные</label>
+                  <label class="filter-option"><input type="radio" name="active" value="0" {% if filter_active==0 %}checked{% endif %}/> Только неактивные</label>
+                </div>
               </div>
-            </div>
-          </th>
-          <th style="position:relative;"><span class="th-inner"><span class="th-text">Последняя активность</span>
-            <button class="filter-icon" data-filter="last_hours" title="Фильтр">
-              <svg viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>
-            </button>
-            <button class="filter-icon sort-trigger" data-sort="last" title="Сортировка">
-              <svg viewBox="0 0 24 24"><path d="M7 10l5-5 5 5H7zm10 4l-5 5-5-5h10z"/></svg>
-            </button></span>
-            {% if filter_last_hours %}
-            <button class="filter-clear" data-clear="last_hours" title="Сбросить">
-              <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12.01l6.3 6.29-1.41 1.41L10.59 13.4 4.3 19.71 2.89 18.3 9.18 12 2.89 5.71 4.3 4.3l6.29 6.29 6.3-6.29z"/></svg>
-            </button>
-            {% endif %}
-            <div class="filter-popover" data-popover="last_hours">
-              <div class="filter-header">Активность за последние N часов</div>
-              <div class="filter-body">
-                <div style="display:flex; gap:8px; align-items:center;">
-                  <input type="number" min="0" step="1" class="filter-input" data-name="last_hours" value="{{ filter_last_hours or '' }}" placeholder="Часы" style="width:100px;"/>
-                  <div class="filter-presets">
-                    <button type="button" class="preset" data-value="1">1ч</button>
-                    <button type="button" class="preset" data-value="6">6ч</button>
-                    <button type="button" class="preset" data-value="24">24ч</button>
+            </th>
+            <th style="position:relative;"><span class="th-inner"><span class="th-text">Последняя активность</span>
+              <button class="filter-icon" data-filter="last_hours" title="Фильтр">
+                <svg viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>
+              </button>
+              <button class="filter-icon sort-trigger" data-sort="last" title="Сортировка">
+                <svg viewBox="0 0 24 24"><path d="M7 10l5-5 5 5H7zm10 4l-5 5-5-5h10z"/></svg>
+              </button></span>
+              {% if filter_last_hours %}
+              <button class="filter-clear" data-clear="last_hours" title="Сбросить">
+                <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12.01l6.3 6.29-1.41 1.41L10.59 13.4 4.3 19.71 2.89 18.3 9.18 12 2.89 5.71 4.3 4.3l6.29 6.29 6.3-6.29z"/></svg>
+              </button>
+              {% endif %}
+              <div class="filter-popover" data-popover="last_hours">
+                <div class="filter-header">Активность за последние N часов</div>
+                <div class="filter-body">
+                  <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="number" min="0" step="1" class="filter-input" data-name="last_hours" value="{{ filter_last_hours or '' }}" placeholder="Часы" style="width:100px;"/>
+                    <div class="filter-presets">
+                      <button type="button" class="preset" data-value="1">1ч</button>
+                      <button type="button" class="preset" data-value="6">6ч</button>
+                      <button type="button" class="preset" data-value="24">24ч</button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in rows %}
-        <tr>
-          <td>{{ r.user_id }}</td>
-          <td>
-            {% if r.active_task %}
-              <span class="status-pill status-published">да</span>
-            {% else %}
-              <span class="status-pill status-draft">нет</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if r.active_task %}
-              <span class="status-pill status-published">active</span>
-            {% else %}
-              {% if r.last_activity_ts %}
-                <span class="status-pill status-archived"><span class="js-relative-ago" data-ts="{{ r.last_activity_ts }}"></span></span>
+            </th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td>{{ r.user_id }}</td>
+            <td>
+              {% if r.active_task %}
+                <span class="status-pill status-published">да</span>
               {% else %}
-                <span class="status-pill status-archived">-</span>
+                <span class="status-pill status-draft">нет</span>
               {% endif %}
-            {% endif %}
-          </td>
-          <td class="actions">
-            <a class="icon-btn" href="/admin/redis/users/{{ r.user_id }}" title="Открыть карточку" aria-label="Открыть">
-              <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
-            </a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+            </td>
+            <td>
+              {% if r.active_task %}
+                <span class="status-pill status-published">active</span>
+              {% else %}
+                {% if r.last_activity_ts %}
+                  <span class="status-pill status-archived"><span class="js-relative-ago" data-ts="{{ r.last_activity_ts }}"></span></span>
+                {% else %}
+                  <span class="status-pill status-archived">-</span>
+                {% endif %}
+              {% endif %}
+            </td>
+            <td class="actions">
+              <a class="icon-btn" href="/admin/redis/users/{{ r.user_id }}" title="Открыть карточку" aria-label="Открыть">
+                <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 {% endblock %}

@@ -74,8 +74,8 @@ async def redis_users(
     request: Request,
     active: int | None = Query(default=None, description="1=только активные, 0=только неактивные"),
     last_hours: int | None = Query(default=None, description="Показывать активных за последние N часов"),
-    sort: str | None = Query(default=None, description="user|active|last|title"),
-    dir: str | None = Query(default=None, description="asc|desc"),
+    sort: str | None = Query(default="last", description="user|active|last|title"),
+    dir: str | None = Query(default="desc", description="asc|desc"),
     admin: AdminUser = Depends(get_current_admin),
 ):
     users = await redis_cache.list_users()

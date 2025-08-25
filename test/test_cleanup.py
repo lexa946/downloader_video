@@ -23,14 +23,14 @@ async def test_cleanup_removes_stale_completed_and_sets_done(tmp_path, monkeypat
     # Очистим потенциальные ключи под этим префиксом
     async for k in redis_cache.redis.scan_iter(f"{test_prefix}*"):
         await redis_cache.redis.delete(k)
-
-    # Создадим фиктивный файл и задачу COMPLETED старше 24ч
     file_path = tmp_path / "author" / "test.mp4"
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_bytes(b"x" * 10)
 
     # Сделаем mtime глубоко старым
-    old_ts = time.time() - (25 * 60 * 60)
+    # Сузим окно до 1 часа, чтобы ускорить тест
+    monkeypatch.setattr(settings, "CLEANUP_RETENTION_HOURS", 1)
+    old_ts = time.time() - (2 * 60 * 60)
     os_utime = __import__("os").utime
     os_utime(file_path.as_posix(), (old_ts, old_ts))
 

@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     DOWNLOAD_FOLDER: str
     FFMPEG_PATH: str
     MIN_VIDEO_HEIGHT: int
+    # Хранение: через сколько часов удалять нескачанные пользователем файлы
+    CLEANUP_RETENTION_HOURS: int = 24
 
     S3_ACCESS_KEY: str
     S3_SECRET_KEY: str

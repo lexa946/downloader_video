@@ -17,7 +17,7 @@ async def cleanup_old_videos(ctx) -> None:
     Удаляются только задачи в статусе COMPLETED с существующим файлом,
     старше 24 часов. После удаления статус переводится в DONE.
     """
-    threshold_seconds = 24 * 60 * 60
+    threshold_seconds = settings.CLEANUP_RETENTION_HOURS * 60 * 60
     now = time.time()
 
     try:

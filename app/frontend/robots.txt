@@ -2,11 +2,15 @@ User-agent: *
 Allow: /
 Allow: /faq
 Allow: /privacy
+Allow: /terms
 Allow: /static/
 Allow: /blog/
 
 # Запрещаем индексацию API эндпоинтов
 Disallow: /api/
+
+# Запрещаем индексацию Admin эндпоинтов
+Disallow: /admin/
 
 # Запрещаем индексацию временных файлов скачивания
 Disallow: /downloads/
@@ -16,6 +20,7 @@ Disallow: /temp/
 Allow: /$
 Allow: /faq$
 Allow: /privacy$
+Allow: /terms$
 
 # Указываем sitemap
 Sitemap: https://downloader.pozharsite.ru/sitemap.xml

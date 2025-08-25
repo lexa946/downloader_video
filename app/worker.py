@@ -91,7 +91,7 @@ class WorkerSettings:
     functions = [download_video]
     job_timeout = 60 * 60
 
-    # Run cleanup daily at 03:00 UTC with slight jitter
+    # Run cleanup daily at 03:00 UTC
     cron_jobs = [
-        cron(cleanup_old_videos, hour=3, minute=0, jitter=60),
+        cron(cleanup_old_videos, hour=3, minute=0),
     ]

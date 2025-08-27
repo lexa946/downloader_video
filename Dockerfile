@@ -11,5 +11,8 @@ COPY app ./app
 COPY test ./test
 COPY *.py ./
 
+# Set uvloop as default event loop policy
+ENV PYTHONPATH=/app
+ENV UVICORN_LOOP=uvloop
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80", "--loop", "uvloop"]

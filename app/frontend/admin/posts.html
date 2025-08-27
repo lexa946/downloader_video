@@ -17,92 +17,94 @@
       <h1 class="admin-title">Посты</h1>
       <a class="cta-button" href="/admin/posts/new">Новый пост</a>
     </div>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Заголовок</th>
-          <th>Слаг</th>
-          <th>Статус</th>
-          <th>Действия</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in posts %}
-        <tr>
-          <td>{{ p.id }}</td>
-          <td>{{ p.title }}</td>
-          <td>{{ p.slug }}</td>
-          <td>
-            {% if p.status == 'published' %}
-              <span class="status-pill status-published">published</span>
-            {% elif p.status == 'draft' %}
-              <span class="status-pill status-draft">draft</span>
-            {% else %}
-              <span class="status-pill status-archived">archived</span>
-            {% endif %}
-          </td>
-          <td class="actions">
-            <a class="icon-btn" href="/admin/posts/{{ p.id }}/edit" title="Редактировать" aria-label="Редактировать">
-              <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42L18.37 3.29a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z"/></svg>
-            </a>
-            {% if p.status == 'published' %}
-            <a class="icon-btn" href="/blog/{{ p.slug }}" target="_blank" title="Открыть пост" aria-label="Открыть пост">
-              <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
-            </a>
-            {% endif %}
-            {% if p.status == 'published' %}
-            <form method="post" action="/admin/posts/{{ p.id }}/unpublish" style="display:inline; margin-left:8px;" onsubmit="return false;">
-              <button class="icon-btn warning" type="button" onclick="openModal('unpub-{{ p.id }}')" title="Снять с публикации" aria-label="Снять с публикации">
-                <svg viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
-              </button>
-              <div id="unpub-{{ p.id }}" class="modal-overlay" onclick="if(event.target===this)closeModal('unpub-{{ p.id }}')">
-                <div class="modal">
-                  <h3>Снять публикацию?</h3>
-                  <p>Пост станет черновиком.</p>
-                  <div class="modal-actions">
-                    <button type="button" class="btn secondary" onclick="closeModal('unpub-{{ p.id }}')">Отмена</button>
-                    <button type="submit" class="btn primary" onclick="this.closest('form').submit()">Подтвердить</button>
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Заголовок</th>
+            <th>Слаг</th>
+            <th>Статус</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in posts %}
+          <tr>
+            <td>{{ p.id }}</td>
+            <td>{{ p.title }}</td>
+            <td>{{ p.slug }}</td>
+            <td>
+              {% if p.status == 'published' %}
+                <span class="status-pill status-published">published</span>
+              {% elif p.status == 'draft' %}
+                <span class="status-pill status-draft">draft</span>
+              {% else %}
+                <span class="status-pill status-archived">archived</span>
+              {% endif %}
+            </td>
+            <td class="actions">
+              <a class="icon-btn" href="/admin/posts/{{ p.id }}/edit" title="Редактировать" aria-label="Редактировать">
+                <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42L18.37 3.29a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z"/></svg>
+              </a>
+              {% if p.status == 'published' %}
+              <a class="icon-btn" href="/blog/{{ p.slug }}" target="_blank" title="Открыть пост" aria-label="Открыть пост">
+                <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+              </a>
+              {% endif %}
+              {% if p.status == 'published' %}
+              <form method="post" action="/admin/posts/{{ p.id }}/unpublish" style="display:inline; margin-left:8px;" onsubmit="return false;">
+                <button class="icon-btn warning" type="button" onclick="openModal('unpub-{{ p.id }}')" title="Снять с публикации" aria-label="Снять с публикации">
+                  <svg viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
+                </button>
+                <div id="unpub-{{ p.id }}" class="modal-overlay" onclick="if(event.target===this)closeModal('unpub-{{ p.id }}')">
+                  <div class="modal">
+                    <h3>Снять публикацию?</h3>
+                    <p>Пост станет черновиком.</p>
+                    <div class="modal-actions">
+                      <button type="button" class="btn secondary" onclick="closeModal('unpub-{{ p.id }}')">Отмена</button>
+                      <button type="submit" class="btn primary" onclick="this.closest('form').submit()">Подтвердить</button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </form>
-            {% else %}
-            <form method="post" action="/admin/posts/{{ p.id }}/publish" style="display:inline; margin-left:8px;" onsubmit="return false;">
-              <button class="icon-btn success" type="button" onclick="openModal('pub-{{ p.id }}')" title="Опубликовать" aria-label="Опубликовать">
-                <svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-              </button>
-              <div id="pub-{{ p.id }}" class="modal-overlay" onclick="if(event.target===this)closeModal('pub-{{ p.id }}')">
-                <div class="modal">
-                  <h3>Опубликовать пост?</h3>
-                  <div class="modal-actions">
-                    <button type="button" class="btn secondary" onclick="closeModal('pub-{{ p.id }}')">Отмена</button>
-                    <button type="submit" class="btn primary" onclick="this.closest('form').submit()">Опубликовать</button>
+              </form>
+              {% else %}
+              <form method="post" action="/admin/posts/{{ p.id }}/publish" style="display:inline; margin-left:8px;" onsubmit="return false;">
+                <button class="icon-btn success" type="button" onclick="openModal('pub-{{ p.id }}')" title="Опубликовать" aria-label="Опубликовать">
+                  <svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                </button>
+                <div id="pub-{{ p.id }}" class="modal-overlay" onclick="if(event.target===this)closeModal('pub-{{ p.id }}')">
+                  <div class="modal">
+                    <h3>Опубликовать пост?</h3>
+                    <div class="modal-actions">
+                      <button type="button" class="btn secondary" onclick="closeModal('pub-{{ p.id }}')">Отмена</button>
+                      <button type="submit" class="btn primary" onclick="this.closest('form').submit()">Опубликовать</button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </form>
-            {% endif %}
-            <form method="post" action="/admin/posts/{{ p.id }}/delete" style="display:inline; margin-left:8px;" onsubmit="return false;">
-              <button class="icon-btn danger" type="button" onclick="openModal('del-{{ p.id }}')" title="Удалить" aria-label="Удалить">
-                <svg viewBox="0 0 24 24"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-              </button>
-              <div id="del-{{ p.id }}" class="modal-overlay" onclick="if(event.target===this)closeModal('del-{{ p.id }}')">
-                <div class="modal">
-                  <h3>Удалить пост?</h3>
-                  <p>Действие необратимо.</p>
-                  <div class="modal-actions">
-                    <button type="button" class="btn secondary" onclick="closeModal('del-{{ p.id }}')">Отмена</button>
-                    <button type="submit" class="btn danger" onclick="this.closest('form').submit()">Удалить</button>
+              </form>
+              {% endif %}
+              <form method="post" action="/admin/posts/{{ p.id }}/delete" style="display:inline; margin-left:8px;" onsubmit="return false;">
+                <button class="icon-btn danger" type="button" onclick="openModal('del-{{ p.id }}')" title="Удалить" aria-label="Удалить">
+                  <svg viewBox="0 0 24 24"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                </button>
+                <div id="del-{{ p.id }}" class="modal-overlay" onclick="if(event.target===this)closeModal('del-{{ p.id }}')">
+                  <div class="modal">
+                    <h3>Удалить пост?</h3>
+                    <p>Действие необратимо.</p>
+                    <div class="modal-actions">
+                      <button type="button" class="btn secondary" onclick="closeModal('del-{{ p.id }}')">Отмена</button>
+                      <button type="submit" class="btn danger" onclick="this.closest('form').submit()">Удалить</button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 {% endblock %}

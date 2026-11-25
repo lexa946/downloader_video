@@ -7,6 +7,7 @@ ffmpeg
 test.*
 
 cookie*
+!cookie-consent.js
 .cursorrules
 .cursor/rules/*
 ./pg_data/*

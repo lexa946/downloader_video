@@ -88,7 +88,7 @@ class InstagramParser(BaseParser):
     @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             async with session.get(self.url, headers=self.headers) as response:
                 response.raise_for_status()
                 response_text = await response.text()
@@ -212,16 +212,19 @@ class InstagramParser(BaseParser):
         return InstagramVideo(title, og_video, preview, duration, quality, 0, author)
 
     async def get_formats(self) -> SVideoResponse:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.url, headers=self.headers) as response:
-                response.raise_for_status()
-                response_text = await response.text()
+        try:
+            async with aiohttp.ClientSession(trust_env=True) as session:
+                async with session.get(self.url, headers=self.headers) as response:
+                    response.raise_for_status()
+                    response_text = await response.text()
+        except (aiohttp.ClientConnectionError, asyncio.TimeoutError) as exc:
+            raise HTTPException(502, "Не удалось подключиться к Instagram. Проверьте сеть и настройки прокси.") from exc
 
         video = self._parse_video_attributes(response_text, self.url)
 
         if not video.size:
             try:
-                async with aiohttp.ClientSession() as session2:
+                async with aiohttp.ClientSession(trust_env=True) as session2:
                     async with session2.head(video.content_url, headers=self._asset_headers) as head_resp:
                         clen = head_resp.headers.get('Content-Length') or head_resp.headers.get('content-length')
                         if clen:

@@ -39,7 +39,7 @@ async def stream_file(file_path: Path, task: DownloadTask, chunk_size: int = 102
 
 
 async def save_preview_on_s3(preview_url: str, key: str, folder: str = None) -> str:
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=True) as session:
         async with session.get(preview_url) as resp:
             content = await resp.content.read()
             return await asyncio.to_thread(

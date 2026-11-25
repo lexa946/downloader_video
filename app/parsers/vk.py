@@ -107,7 +107,7 @@ class VkParser(BaseParser):
     @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
-        async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context)) as session:
+        async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context), trust_env=False) as session:
             response_json = await self._get_video_info(session)
             video = VkVideo.from_json(response_json)
 
@@ -168,7 +168,7 @@ class VkParser(BaseParser):
 
     async def get_formats(self) -> SVideoResponse:
         try:
-            async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context)) as session:
+            async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context), trust_env=False) as session:
                 response_json = await self._get_video_info(session)
             
             video = VkVideo.from_json(response_json)
@@ -176,7 +176,7 @@ class VkParser(BaseParser):
             if not video.content_urls:
                 raise ValueError("No video URLs found in VK response")
 
-            async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context)) as session:
+            async with aiohttp.ClientSession(headers=self._headers, connector=aiohttp.TCPConnector(ssl=self._ssl_context), trust_env=False) as session:
                 file_sizes = await self._get_file_sizes(session, video.content_urls)
             
             video.content_sizes = file_sizes

@@ -3,6 +3,7 @@ import asyncio
 import aiohttp
 import json as _json
 import ssl
+import errno
 
 from datetime import timedelta
 from logging import getLogger
@@ -51,6 +52,13 @@ class YouTubeParser(BaseParser):
                 return await asyncio.to_thread(operation)
             except (URLError, ssl.SSLError, MaxRetriesExceeded) as exc:
                 reason = exc.reason if isinstance(exc, URLError) else exc
+                if isinstance(reason, OSError) and reason.errno in (
+                    errno.ENETUNREACH, errno.EHOSTUNREACH, errno.ECONNREFUSED, errno.ETIMEDOUT
+                ):
+                    LOG.warning("YouTube connection failed while %s: %s", stage, reason)
+                    raise YouTubeConnectionError(
+                        "Не удалось подключиться к YouTube. Проверьте сеть и настройки прокси."
+                    ) from exc
                 if not isinstance(reason, (ssl.SSLEOFError, MaxRetriesExceeded)):
                     raise
                 if attempt == 1:
@@ -67,7 +75,7 @@ class YouTubeParser(BaseParser):
         try:
             search_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
 
-            async with aiohttp.ClientSession(headers={
+            async with aiohttp.ClientSession(trust_env=True, headers={
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "Accept-Language": "ru,en;q=0.9",

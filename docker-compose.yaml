@@ -11,6 +11,10 @@ x-app: &app
     REDIS_HOST: redis
     REDIS_PORT: "6379"
     FORWARDED_ALLOW_IPS: ${TRUSTED_PROXY_IPS:-127.0.0.1}
+    HTTPS_PROXY: ${MEDIA_PROXY_URL:-}
+    https_proxy: ${MEDIA_PROXY_URL:-}
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
   volumes:
     - downloads:/downloads
   depends_on:

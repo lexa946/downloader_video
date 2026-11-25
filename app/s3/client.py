@@ -1,6 +1,5 @@
 from typing import BinaryIO
 
-import urllib3
 from minio import Minio
 from minio.error import S3Error
 
@@ -18,7 +17,6 @@ class S3Client:
             access_key=access_key,
             secret_key=secret_key,
             secure=not endpoint_url.startswith("http://"),
-            http_client=urllib3.PoolManager(cert_reqs='CERT_NONE')
         )
 
         # Создаем бакет, если его нет

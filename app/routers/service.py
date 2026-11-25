@@ -85,7 +85,9 @@ async def active_download(request: Request) -> SVideoStatus | None:
 async def start_download(request: Request, video_download: SVideoDownload,
                          background_tasks: BackgroundTasks) -> SVideoStatus:
     """Запускает процесс скачивания"""
-    user_id = request.cookies.get("user_id", "0")
+    user_id = request.cookies.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=403, detail="Сеанс недействителен. Обновите страницу.")
     task_id = str(uuid.uuid4())
 
     if user_id and user_id != "0":
@@ -131,10 +133,17 @@ async def start_download(request: Request, video_download: SVideoDownload,
 
 @router.get("/download-status/{task_id}")
 @check_task_id
-async def get_download_status(task_id: Annotated[str, Path()]) -> SVideoStatus:
+async def get_download_status(request: Request, task_id: Annotated[str, Path()]) -> SVideoStatus:
     """Проверяет статус загрузки"""
     task = await redis_cache.get_download_task(task_id)
+    await require_task_owner(request, task_id)
     return task.video_status
+
+
+async def require_task_owner(request: Request, task_id: str):
+    user_id = request.cookies.get("user_id")
+    if not user_id or await redis_cache.get_task_user(task_id) != user_id:
+        raise HTTPException(status_code=404, detail="Загрузка не найдена.")
 
 
 @router.get("/download-events/{task_id}")
@@ -143,6 +152,7 @@ async def download_events(request: Request, task_id: Annotated[str, Path()]):
     """SSE поток обновлений прогресса для задачи скачивания"""
     if not await redis_cache.exist_download_task(task_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    await require_task_owner(request, task_id)
 
     channel = redis_cache.channel_for_task(task_id)
     pubsub = redis_cache.redis.pubsub()
@@ -202,9 +212,10 @@ async def cancel_download(request: Request, task_id: Annotated[str, Path()]):
 
 @router.get("/get-video/{task_id}")
 @check_task_id
-async def get_downloaded_video(task_id: Annotated[str, Path()]):
+async def get_downloaded_video(request: Request, task_id: Annotated[str, Path()]):
     """Отдает файл, если он скачан"""
     task: DownloadTask = await redis_cache.get_download_task(task_id)
+    await require_task_owner(request, task_id)
 
     if task.video_status.status == VideoDownloadStatus.PENDING:
         raise HTTPException(

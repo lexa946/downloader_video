@@ -2,7 +2,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from starlette.responses import JSONResponse
-from starlette.middleware.cors import CORSMiddleware
+from app.config import settings
 from starlette.responses import FileResponse
 from starlette.staticfiles import StaticFiles
 
@@ -13,7 +13,9 @@ from app.models.cache import redis_cache
 from app.models.status import VideoDownloadStatus
 from app.models.queue import task_queue
 
-app = FastAPI()
+app = FastAPI(docs_url=None if settings.APP_ENV == "production" else "/docs",
+              redoc_url=None if settings.APP_ENV == "production" else "/redoc",
+              openapi_url=None if settings.APP_ENV == "production" else "/openapi.json")
 
 @app.middleware("http")
 async def require_cookie_consent(request: Request, call_next):
@@ -26,14 +28,6 @@ app.include_router(consent_router)
 app.include_router(service_router)
 app.include_router(new_front_router)
 app.mount("/static", StaticFiles(directory="app/frontend/static"), name="static")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["POST", "GET", "PUT", "DELETE"],
-    allow_headers=["*"],
-)
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():

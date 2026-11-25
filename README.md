@@ -1,4 +1,5 @@
 # [Скачивальщик видео](https://downloader.pozhar.keenetic.pro/)
+Инструкция по запуску на сервере находится в [PRODUCTION.md](PRODUCTION.md).
 #### [Ссылка на приложение](https://downloader.pozhar.keenetic.pro/) ⬅️
 ## Поддерживаемые сервисы
 - Youtube

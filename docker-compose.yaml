@@ -45,7 +45,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "127.0.0.1:${WEB_PORT:-8084}:80"
+      - "${WEB_BIND_HOST:-0.0.0.0}:${WEB_PORT:-8084}:80"
     healthcheck:
       test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1/', timeout=3).close()"]
       interval: 15s

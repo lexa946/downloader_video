@@ -10,6 +10,7 @@ x-app: &app
     DOWNLOAD_FOLDER: /downloads
     REDIS_HOST: redis
     REDIS_PORT: "6379"
+    FORWARDED_ALLOW_IPS: ${TRUSTED_PROXY_IPS:-127.0.0.1}
   volumes:
     - downloads:/downloads
   depends_on:

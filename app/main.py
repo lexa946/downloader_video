@@ -1,11 +1,13 @@
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from starlette.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse
 from starlette.staticfiles import StaticFiles
 
 from app.routers.service import router as service_router
+from app.routers.consent import router as consent_router, has_consent
 from app.routers.front import router as new_front_router
 from app.models.cache import redis_cache
 from app.models.status import VideoDownloadStatus
@@ -13,6 +15,14 @@ from app.models.queue import task_queue
 
 app = FastAPI()
 
+@app.middleware("http")
+async def require_cookie_consent(request: Request, call_next):
+    if request.url.path.startswith("/api/") and not request.url.path.startswith("/api/cookie-consent"):
+        if not await has_consent(request):
+            return JSONResponse({"detail": "Требуется согласие на использование cookie."}, status_code=403)
+    return await call_next(request)
+
+app.include_router(consent_router)
 app.include_router(service_router)
 app.include_router(new_front_router)
 app.mount("/static", StaticFiles(directory="app/frontend/static"), name="static")

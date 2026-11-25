@@ -30,6 +30,23 @@
     </nav>
     <a href="/privacy">Конфиденциальность</a>
     <a href="/terms">Условия</a>
+    <button class="cookie-settings" type="button" id="cookieSettings">Настройки cookie</button>
   </footer>
+  {% if request.url.path in ('/', '/youtube-downloader', '/instagram-downloader', '/vk-downloader') %}
+  <div class="consent-backdrop" id="consentBackdrop">
+    <section class="consent-dialog" role="dialog" aria-modal="true" aria-labelledby="consentTitle" aria-describedby="consentDescription">
+      <span class="consent-mark" aria-hidden="true">◉</span>
+      <h2 id="consentTitle">Файлы cookie</h2>
+      <p id="consentDescription">Мы используем cookie для работы сайта, сбора рекламных метрик и показа рекламы. Для использования сервиса нужно согласиться со всеми перечисленными целями.</p>
+      <p id="consentDeclined" class="consent-declined" hidden>Вы отказались от cookie. Поиск и скачивание видео недоступны. Вы можете изменить решение.</p>
+      <a href="/privacy">Политика конфиденциальности</a>
+      <div class="consent-actions">
+        <button type="button" id="declineCookies">Не согласен</button>
+        <button type="button" class="primary" id="acceptCookies">Согласен, продолжить</button>
+      </div>
+    </section>
+  </div>
+  {% endif %}
+  <script defer src="/static/js/cookie-consent.js"></script>
 </body>
 </html>

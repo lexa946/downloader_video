@@ -4,8 +4,6 @@ from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import FileResponse, HTMLResponse
 
-from app.utils.validators_utils import get_user_id
-
 router = APIRouter(tags=["Фронт"])
 
 # Настройка путей
@@ -14,7 +12,6 @@ templates = Jinja2Templates(directory=str(FRONTEND_DIR))
 
 
 @router.get("/")
-@get_user_id
 async def index(request: Request):
     """Главная Страница"""
     response = templates.TemplateResponse(request, "parsers/index.html")
@@ -22,7 +19,6 @@ async def index(request: Request):
 
 
 @router.get("/youtube-downloader", response_class=HTMLResponse)
-@get_user_id
 async def youtube_downloader(request: Request):
     """Страница YouTube Downloader"""
     response = templates.TemplateResponse(request, "parsers/youtube-downloader.html")
@@ -30,7 +26,6 @@ async def youtube_downloader(request: Request):
 
 
 @router.get("/instagram-downloader", response_class=HTMLResponse)
-@get_user_id
 async def instagram_downloader(request: Request):
     """Страница Instagram Downloader"""
     response = templates.TemplateResponse(request, "parsers/instagram-downloader.html")
@@ -38,7 +33,6 @@ async def instagram_downloader(request: Request):
 
 
 @router.get("/vk-downloader", response_class=HTMLResponse)
-@get_user_id
 async def vk_downloader(request: Request):
     """Страница VK Downloader"""
     response = templates.TemplateResponse(request, "parsers/vk-downloader.html")

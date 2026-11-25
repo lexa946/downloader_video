@@ -53,7 +53,7 @@ const clearInputBtn = document.getElementById('clearInput');
 document.addEventListener('DOMContentLoaded', function() {
 
     setActiveNavigation();
-    restoreActiveDownload();
+    if (document.getElementById('consentBackdrop')?.hidden) restoreActiveDownload();
 
     analyzeTab.addEventListener('submit', event => {
         event.preventDefault();
@@ -157,6 +157,7 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleClearButton();
     }
 });
+document.addEventListener('cookie-consent-accepted', restoreActiveDownload);
 
 // Utility functions
 function showFeedback(message, error = false) {

@@ -1,6 +1,4 @@
-import json
-from typing import Optional, Dict, List
-from datetime import datetime, timezone
+from typing import Optional, Dict
 from redis.asyncio import Redis
 
 from app.config import settings
@@ -26,14 +24,6 @@ class RedisCache:
     def channel_for_task(self, task_id: str) -> str:
         """Return Redis Pub/Sub channel name for a given task."""
         return self._get_key(f"events:{task_id}")
-
-    async def publish_progress(self, task: DownloadTask) -> None:
-        """Publish current task progress to Redis Pub/Sub channel for SSE consumers."""
-        payload = {
-            "task_id": task.id_,
-            **task.video_status.model_dump(),
-        }
-        await self.redis.publish(self.channel_for_task(task.id_), json.dumps(payload))
 
     async def get_video_meta(self, url: str) -> Optional[SVideoResponse]:
         """Get video metadata from cache"""
@@ -65,8 +55,25 @@ class RedisCache:
     async def set_download_task(self, task: DownloadTask) -> None:
         """Store download task in cache"""
         key = self._get_key(f"task:{task.id_}")
-        await self.redis.set(key, task.to_jsons())
-        await self.publish_progress(task)
+        expired_states = (VideoDownloadStatus.ERROR, VideoDownloadStatus.DONE, VideoDownloadStatus.CANCELED)
+        ttl = self.ttl if task.video_status.status in expired_states else None
+        saved = await self.redis.eval(
+            """
+            if redis.call('EXISTS', KEYS[2]) == 1 and ARGV[4] ~= 'canceled' then return 0 end
+            if tonumber(ARGV[2]) > 0 then
+                redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+            else
+                redis.call('SET', KEYS[1], ARGV[1])
+            end
+            redis.call('PUBLISH', ARGV[3], ARGV[5])
+            return 1
+            """,
+            2, key, self._get_key(f"cancel:{task.id_}"),
+            task.to_jsons(), ttl or 0, self.channel_for_task(task.id_),
+            task.video_status.status, task.video_status.model_dump_json(),
+        )
+        if not saved:
+            return
         status = task.video_status.status
         if status in (VideoDownloadStatus.COMPLETED, VideoDownloadStatus.ERROR, VideoDownloadStatus.DONE,
                       VideoDownloadStatus.CANCELED):
@@ -74,13 +81,25 @@ class RedisCache:
             if user_id:
                 await self.release_user_active_task(user_id, task.id_)
 
-    async def set_task_canceled(self, task_id: str) -> None:
-        key = self._get_key(f"cancel:{task_id}")
-        await self.redis.set(key, "1", ex=self.lock_ttl)
-
-    async def clear_task_canceled(self, task_id: str) -> None:
-        key = self._get_key(f"cancel:{task_id}")
-        await self.redis.delete(key)
+    async def cancel_pending_task(self, task_id: str) -> bool:
+        return bool(await self.redis.eval(
+            """
+            local raw = redis.call('GET', KEYS[1])
+            if not raw then return 0 end
+            local task = cjson.decode(raw)
+            local status = task.video_status
+            if status.status == 'canceled' then return 1 end
+            if status.status ~= 'pending' then return 0 end
+            status.status = 'canceled'
+            status.description = 'Загрузка отменена.'
+            redis.call('SET', KEYS[2], '1', 'EX', ARGV[1])
+            redis.call('SET', KEYS[1], cjson.encode(task), 'EX', ARGV[2])
+            redis.call('PUBLISH', ARGV[3], cjson.encode(status))
+            return 1
+            """,
+            2, self._get_key(f"task:{task_id}"), self._get_key(f"cancel:{task_id}"),
+            self.lock_ttl, max(1, self.ttl), self.channel_for_task(task_id),
+        ))
 
     async def is_task_canceled(self, task_id: str) -> bool:
         key = self._get_key(f"cancel:{task_id}")
@@ -89,67 +108,6 @@ class RedisCache:
     async def delete_download_task(self, task_id: str):
         key = self._get_key(f"task:{task_id}")
         await self.redis.delete(key)
-
-    async def get_user_tasks(self, user_id: str) -> List[str]:
-        """Get list of user's task IDs"""
-        key = self._get_key(f"user:{user_id}")
-        return await self.redis.lrange(key, 0, -1)
-
-    async def add_user_task(self, user_id: str, task_id: str) -> None:
-        """Add task ID to user's task list"""
-        key = self._get_key(f"user:{user_id}")
-
-        try:
-            to_remove = await self.redis.lrange(key, 5, -1)
-        except Exception:
-            to_remove = []
-
-        await self.redis.lpush(key, task_id)
-        await self.redis.ltrim(key, 0, 5)
-
-        for old_task_id in to_remove:
-            try:
-                await self.delete_download_task(old_task_id)
-            except Exception:
-                pass
-
-    async def list_users(self) -> List[str]:
-        """Return list of user_ids that have any tasks recorded."""
-        users: List[str] = []
-        pattern = self._get_key("user:*")
-        async for key in self.redis.scan_iter(pattern):
-            # key format: <prefix>user:<user_id>
-            try:
-                user_id = key.split(":")[-1]
-                users.append(user_id)
-            except Exception:
-                continue
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_users: List[str] = []
-        for uid in users:
-            if uid not in seen:
-                seen.add(uid)
-                unique_users.append(uid)
-        return unique_users
-
-    async def set_user_activity(self, user_id: str) -> None:
-        """Record last activity timestamp (UTC ISO) for user."""
-        key = self._get_key(f"activity:{user_id}")
-        now_iso = datetime.now(timezone.utc).isoformat()
-        await self.redis.set(key, now_iso)
-
-    async def get_user_activity(self, user_id: str) -> Optional[str]:
-        key = self._get_key(f"activity:{user_id}")
-        return await self.redis.get(key)
-
-    async def set_user_last_task(self, user_id: str, task_id: str) -> None:
-        key = self._get_key(f"last_task:{user_id}")
-        await self.redis.set(key, task_id)
-
-    async def get_user_last_task(self, user_id: str) -> Optional[str]:
-        key = self._get_key(f"last_task:{user_id}")
-        return await self.redis.get(key)
 
     async def get_user_active_task(self, user_id: str) -> Optional[str]:
         """Return currently active task_id for user if exists."""

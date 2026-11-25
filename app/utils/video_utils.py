@@ -2,13 +2,13 @@ import asyncio
 import platform
 import subprocess
 import sys
+from io import BytesIO
 from typing import Callable, Optional, Dict
 from logging import getLogger
 from pathlib import Path
 
 import aiofiles
 import aiohttp
-from Crypto.Util.py3compat import BytesIO
 
 from app.config import settings
 from app.exceptions import DownloadUserCanceledException
@@ -29,25 +29,21 @@ else:
 
 
 async def stream_file(file_path: Path, task: DownloadTask, chunk_size: int = 1024 * 1024):
-    task_id = task.video_status.task_id
-    try:
-        async with aiofiles.open(file_path, "rb") as file:
-            while chunk := await file.read(chunk_size):
-                yield chunk
-    finally:
-        await asyncio.sleep(1)
-        file_path.unlink()
-        print(f"Video Utils: stream_file - {file_path} is deleted.")
-        task.video_status.status = VideoDownloadStatus.DONE
-        task.video_status.description = VideoDownloadStatus.DONE
-        await redis_cache.set_download_task(task)
+    async with aiofiles.open(file_path, "rb") as file:
+        while chunk := await file.read(chunk_size):
+            yield chunk
+    file_path.unlink(missing_ok=True)
+    task.video_status.status = VideoDownloadStatus.DONE
+    task.video_status.description = VideoDownloadStatus.DONE
+    await redis_cache.set_download_task(task)
 
 
 async def save_preview_on_s3(preview_url: str, key: str, folder: str = None) -> str:
     async with aiohttp.ClientSession() as session:
         async with session.get(preview_url) as resp:
             content = await resp.content.read()
-            return s3_client.upload_file(
+            return await asyncio.to_thread(
+                s3_client.upload_file,
                 key,
                 BytesIO(content),
                 len(content),

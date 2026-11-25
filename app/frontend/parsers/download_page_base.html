@@ -1,244 +1,76 @@
-{% extends 'main/base.html' %}
-
-
+{% extends 'main/studio.html' %}
 {% block content %}
-    <main class="main">
-        {% block hero %}
-            <section class="hero">
-                <h2>Скачивайте видео с любимых платформ</h2>
-                <p class="subtitle">Поддерживаем YouTube, Instagram*, VK, RuTube, TikTok. Без регистрации, в высоком
-                    качестве.</p>
-
-                <!-- Качества для SEO -->
-                <div class="quality-badges">
-                    <span class="badge">1080p</span>
-                    <span class="badge">720p</span>
-                    <span class="badge">480p</span>
-                    <span class="badge">360p</span>
-                    <span class="badge">MP3</span>
-                </div>
-            </section>
-        {% endblock %}
-
-        <section class="download-section">
-
-            <div class="tabs-parser-form">
-                <button class="tab-btn active" data-tab="analyze">Получить форматы</button>
-                <button class="tab-btn" data-tab="search">Поиск</button>
-            </div>
-
-            <!-- Вкладка Поиск -->
-            <div id="searchTab" class="platforms" style="margin-top:8px; display:none;">
-                <div class="url-input-container">
-                    <div class="input-wrapper">
-                        <input type="text" id="ytSearchQuery"
-                               placeholder="Найдите нужное видео на YouTube по запросу. Например: смешные коты 2024"
-                               class="url-input" aria-label="Поисковый запрос по YouTube">
-                        <button id="clearSearch" class="clear-input-btn" title="Очистить">✕</button>
-                    </div>
-                    <button id="searchBtn" class="analyze-btn" aria-label="Искать видео">
-                        <span class="btn-text">Поиск</span>
-                        <span class="btn-loader" style="display:none;">⏳</span>
-                    </button>
-                </div>
-                <div id="ytSearchResults" class="formats-list" style="margin-top:12px;"></div>
-            </div>
-
-            <div id="analyzeTab">
-                <div class="url-input-container">
-                    <div class="input-wrapper">
-                        <input
-                                type="url"
-                                id="videoUrl"
-                                placeholder="Вставьте ссылку на видео (YouTube, Instagram*, VK, RuTube, TikTok)"
-                                class="url-input"
-                                aria-label="Ссылка на видео для скачивания"
-                        >
-                        <button id="clearInput" class="clear-input-btn" title="Очистить поле">
-                            ✕
-                        </button>
-                    </div>
-                    <button id="analyzeBtn" class="analyze-btn" aria-label="Анализировать видео">
-                        <span class="btn-text">Получить форматы</span>
-                        <span class="btn-loader" style="display: none;">⏳</span>
-                    </button>
-                </div>
-
-                <div class="clip-controls" style="flex-basis:100%; width:100%;">
-                    <details id="clipForm" class="clip-form" style="margin-top:8px;">
-                        <summary class="clip-summary">Пост-обработка видео</summary>
-                        <div class="clip-row"
-                             style="display:flex; gap:12px; flex-wrap:nowrap; align-items:flex-end; margin-top:8px;">
-                            <label class="time-field" style="display:flex; flex-direction:column; gap:6px;">
-                                <span class="time-label"
-                                      style="font-size:0.9rem; color:#7f8c8d;">Начало фрагмента</span>
-                                <div class="input-wrapper time-wrapper" style="flex:0 0 auto;">
-                                    <input type="text" id="startTime" inputmode="numeric" maxlength="8"
-                                           pattern="^\\d{2}:\\d{2}:\\d{2}$" placeholder="ЧЧ:ММ:СС"
-                                           class="url-input time-input" aria-label="Время начала в формате ЧЧ:ММ:СС">
-                                    <button id="clearStartTime" class="clear-input-btn" title="Очистить время">✕
-                                    </button>
-                                </div>
-                            </label>
-                            <label class="time-field" style="display:flex; flex-direction:column; gap:6px;">
-                                <span class="time-label" style="font-size:0.9rem; color:#7f8c8d;">Конец фрагмента</span>
-                                <div class="input-wrapper time-wrapper" style="flex:0 0 auto;">
-                                    <input type="text" id="endTime" inputmode="numeric" maxlength="8"
-                                           pattern="^\\d{2}:\\d{2}:\\d{2}$" placeholder="ЧЧ:ММ:СС"
-                                           class="url-input time-input" aria-label="Время конца в формате ЧЧ:ММ:СС">
-                                    <button id="clearEndTime" class="clear-input-btn" title="Очистить время">✕</button>
-                                </div>
-                            </label>
-                        </div>
-                    </details>
-                </div>
-            </div>
-
-
-        </section>
-        <!-- Кнопка для скачивания готового файла -->
-        <section id="downloadReadyContainer" class="download-ready-container" style="display: none;">
-            <div class="download-ready-message">
-                <h4>✅ Файл готов к скачиванию!</h4>
-                <button id="downloadReadyBtn" class="download-ready-btn">
-                    📥 Скачать файл
-                </button>
-            </div>
-        </section>
-
-        <!-- Результаты анализа -->
-        <section id="results" class="results" style="display: none;">
-            <div class="video-info">
-                <div class="video-preview">
-                    <img id="videoThumbnail" src="" alt="Превью видео" style="display: none;">
-                    <div class="video-details">
-                        <h3 id="videoTitle"></h3>
-                        <p id="videoAuthor"></p>
-                        <p id="videoDuration"></p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="formats-container">
-                <h4>Выберите качество и формат:</h4>
-                <div id="formatsList" class="formats-list">
-                    <!-- Форматы будут загружены динамически -->
-                </div>
-            </div>
-        </section>
-
-        <!-- Прогресс скачивания -->
-        <section id="progress" class="progress-section" style="display: none;">
-            <div class="progress-info">
-                <h4>Скачивание видео...</h4>
-                <div class="progress-bar">
-                    <div id="progressFill" class="progress-fill"></div>
-                </div>
-                <p id="progressText">0%</p>
-                <p id="statusText">Подготовка к скачиванию...</p>
-                <p id="speedText" style="margin-top:4px; font-size:0.9rem; color:#7f8c8d;"></p>
-                <p id="etaText" style="margin-top:2px; font-size:0.9rem; color:#7f8c8d;"></p>
-                <button id="cancelBtn" class="download-ready-btn" style="margin-top:10px;">Отменить</button>
-            </div>
-        </section>
-
-        <!-- История скачивания -->
-        <section id="historySection" class="history-section" style="display: none;">
-            <div class="history-header">
-                <h3>📋 История скачивания</h3>
-                <p>Ваши последние 6 скачиваний</p>
-            </div>
-            <div id="historyList" class="history-list">
-                <!-- История будет загружена динамически -->
-            </div>
-            <div class="history-empty" id="historyEmpty" style="display: none;">
-                <p>🎬 История пуста. Скачайте первое видео!</p>
-            </div>
-        </section>
-
-        {% block info_sections %}
-            <!-- Информационные блоки -->
-            <section class="info-sections">
-                <div class="info-grid">
-                    <div class="info-card">
-                        <h3>🆓 Полностью бесплатно</h3>
-                        <p>Скачивайте видео без ограничений и платы. Никаких скрытых комиссий или премиум аккаунтов.</p>
-                    </div>
-                    <div class="info-card">
-                        <h3>🚀 Быстро и просто</h3>
-                        <p>Всего три шага: вставьте ссылку, выберите качество, скачайте. Без регистрации и установки
-                            программ.</p>
-                    </div>
-                    <div class="info-card">
-                        <h3>📱 На всех устройствах</h3>
-                        <p>Работает на компьютере, планшете и телефоне. Адаптивный дизайн для удобного
-                            использования.</p>
-                    </div>
-                    <div class="info-card">
-                        <h3>🎯 Высокое качество</h3>
-                        <p>Поддержка разрешений до 4K. Сохраняем оригинальное качество видео и звука.</p>
-                    </div>
-                </div>
-            </section>
-        {% endblock %}
-        {% block instructions %}
-            <!-- Инструкция по использованию -->
-            <section class="instructions">
-                <h2>Как скачать видео?</h2>
-                <div class="steps">
-                    <div class="step">
-                        <div class="step-number">1</div>
-                        <div class="step-content">
-                            <h4>Найдите видео</h4>
-                            <p>Найдите видео на YouTube, Instagram*, VK или RuTube, которое хотите скачать</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <div class="step-number">2</div>
-                        <div class="step-content">
-                            <h4>Скопируйте ссылку</h4>
-                            <p>Скопируйте ссылку на видео из адресной строки браузера</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <div class="step-number">3</div>
-                        <div class="step-content">
-                            <h4>Вставьте и скачайте</h4>
-                            <p>Вставьте ссылку в поле выше, выберите качество и нажмите скачать</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        {% endblock %}
-
-
-        <!-- Ссылки на отдельные downloader'ы -->
-        <section class="platform-links">
-            <h2>Специализированные скачивальщики</h2>
-            <p>Используйте наши специализированные инструменты для каждой платформы:</p>
-            <div class="info-grid">
-                <div class="info-card">
-                    <h3>🎥 <a href="/youtube-downloader">YouTube Downloader</a></h3>
-                    <p><strong>Скачать видео с YouTube</strong> в высоком качестве. Поддержка MP4 и MP3 форматов.</p>
-                </div>
-                <div class="info-card">
-                    <h3>📸 <a href="/instagram-downloader">Instagram* Downloader</a></h3>
-                    <p><strong>Скачать видео с Instagram*</strong> Reels и Stories без регистрации.</p>
-                </div>
-                <div class="info-card">
-                    <h3>👥 <a href="/vk-downloader">VK Downloader</a></h3>
-                    <p><strong>Скачать видео с VK</strong> (ВКонтакте) в высоком качестве HD.</p>
-                </div>
-                <div class="info-card">
-                    <h3>📺 <a href="/rutube-downloader">RuTube Downloader</a></h3>
-                    <p><strong>Скачать видео с RuTube</strong> быстро и удобно. Поддержка MP4 и MP3.</p>
-                </div>
-                <div class="info-card">
-                    <h3>🎵 <a href="/tiktok-downloader">TikTok Downloader</a></h3>
-                    <p><strong>Скачать видео из TikTok</strong> с музыкой или только аудио.</p>
-                </div>
-            </div>
-        </section>
-    </main>
-    <script src="/static/js/app.js"></script>
+{% set platforms = {'youtube':'YouTube','vk':'ВКонтакте','instagram':'Instagram'} %}
+{% set platform = platforms.get(request.url.path.strip('/').replace('-downloader','')) %}
+<main class="studio">
+  <section class="signal-hero download-section" aria-labelledby="signal-title">
+    <canvas id="signal-art" aria-hidden="true"></canvas>
+    <div class="signal-content">
+      <h1 id="signal-title">{{ 'Скачать видео из' if platform else 'Скачать видео' }}<br><span>{{ platform or 'по ссылке' }}</span></h1>
+      <p>Вставьте ссылку, выберите качество и скачайте видео.</p>
+      <form id="analyzeTab" novalidate>
+        <label class="sr" for="videoUrl">Ссылка на видео</label>
+        <div class="entry">
+          <div class="field">
+            <input id="videoUrl" type="url" placeholder="Ссылка с YouTube, Instagram или VK" autocomplete="off">
+            <button id="clearInput" type="button" aria-label="Очистить ссылку">×</button>
+          </div>
+          <button class="primary request-button" id="analyzeBtn" type="submit">
+            <span class="btn-text">Найти видео</span>
+            <span class="btn-loader">Проверяем…</span>
+          </button>
+        </div>
+      </form>
+      <form id="searchTab" style="display:none">
+        <label class="sr" for="ytSearchQuery">Название или автор на YouTube</label>
+        <div class="entry">
+          <div class="field">
+            <input id="ytSearchQuery" type="search" placeholder="Название ролика или канала">
+            <button id="clearSearch" type="button" aria-label="Очистить поиск">×</button>
+          </div>
+          <button class="primary request-button" id="searchBtn" type="submit">
+            <span class="btn-text">Искать</span>
+            <span class="btn-loader">Ищем…</span>
+          </button>
+        </div>
+      </form>
+      <div class="signal-modes" aria-label="Способ поиска">
+        <button class="tab-btn active" type="button" data-tab="analyze" aria-controls="analyzeTab" aria-pressed="true">По ссылке</button>
+        <button class="tab-btn" type="button" data-tab="search" aria-controls="searchTab" aria-pressed="false">Поиск на YouTube</button>
+      </div>
+      <span id="request-status" class="sr" role="status"></span>
+      <div id="signal-feedback" aria-live="polite"></div>
+    </div>
+  </section>
+  <div id="ytSearchResults" hidden aria-live="polite"></div>
+  <div class="workspace" id="videoWorkspace" hidden>
+    <section class="preview panel" aria-label="Предпросмотр">
+      <div class="screen"><img id="videoThumbnail" alt="" style="display:none"></div>
+      <div class="caption"><h2 id="videoTitle" tabindex="-1">Предпросмотр</h2><p id="videoAuthor"></p><p id="videoDuration"></p></div>
+    </section>
+    <section class="panel inspector">
+      <h2 id="inspectorTitle">Параметры файла</h2>
+      <div id="results" hidden><div id="formatsList"></div></div>
+      <div id="progress" class="download-ring" hidden>
+        <progress id="downloadPercent" class="sr" max="100" value="0" aria-label="Прогресс загрузки"></progress>
+        <div class="download-ring-center">
+          <strong id="progressText" aria-hidden="true">0%</strong>
+          <p id="statusText" role="status"></p>
+          <div class="download-ring-metrics">
+            <span id="speedText" hidden></span>
+            <span id="etaText" hidden></span>
+          </div>
+          <button id="cancelBtn" type="button">Отменить</button>
+          <div id="downloadReadyContainer" hidden>
+            <a class="save-file" id="downloadReadyBtn" download>Сохранить файл</a>
+            <button id="backToFormats" type="button">К параметрам</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script defer src="/static/js/setActiveNavigator.js"></script>
+<script defer src="/static/js/app.js"></script>
+<script defer src="/static/js/signal-art.js"></script>
 {% endblock %}

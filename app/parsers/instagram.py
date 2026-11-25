@@ -1,14 +1,17 @@
 import json
+import logging
 import asyncio
 import aiofiles
 import time
 from pathlib import Path
 
+from fastapi import HTTPException
 import aiohttp
 from dataclasses import dataclass
 from bs4 import BeautifulSoup
 
 from app.config import settings
+from app.exceptions import DownloadUserCanceledException
 from app.models.cache import redis_cache
 from app.models.post_process import PostPrecess
 from app.models.status import VideoDownloadStatus
@@ -32,30 +35,37 @@ class InstagramVideo:
     author: str
 
     @classmethod
-    def from_json(cls, json_: dict):
-        items = json_['require'][0][3][0]['__bbox']['require'][0][3][1]['__bbox']['result']['data'][
-            'xdt_api__v1__media__shortcode__web_info']['items']
+    def from_item(cls, item: dict):
+        stream = next(v for v in item["video_versions"] if v.get("url"))
+        author = (item.get("user") or {}).get("username") or "instagram_user"
+        author = re.sub(r"[^A-Za-z0-9._]", "_", author).strip(".") or "instagram_user"
+        code = item["code"]
+        images = (item.get("image_versions2") or {}).get("candidates") or []
+        quality = f"{stream['width']}x{stream['height']}" if stream.get("width") and stream.get("height") else "unknown"
+        duration = item.get("video_duration") or 0
+        if not duration and item.get("video_dash_manifest"):
+            manifest = BeautifulSoup(item["video_dash_manifest"], features="xml")
+            period = manifest.find("Period")
+            match = re.fullmatch(r"PT([0-9.]+)S", period.get("duration", "")) if period else None
+            if match:
+                duration = float(match[1])
+        return cls(f"video_by_{author}_{code}.mp4", stream["url"], images[0].get("url", "") if images else "",
+                   int(duration), quality, 0, author)
 
-        video_url = items[0]['video_versions'][0]['url']
 
-        video_width = items[0]['video_versions'][0]['width']
-        video_height = items[0]['video_versions'][0]['height']
-        video_quality = f"{video_width}x{video_height}"
-
-        video_preview_url = items[0]['image_versions2']['candidates'][0]['url']
-        video_author = items[0]['user']['username']
-        video_title = f"video_by_{video_author}.mp4"
-
-        manifest_soup = BeautifulSoup(items[0]['video_dash_manifest'], features="xml")
-        video_duration = int(float(manifest_soup.select_one("Period").attrs['duration'][2:-1]))
-
-        video_size = int(
-            manifest_soup.select_one("AdaptationSet[contentType='video'] Representation").attrs['FBContentLength'])
-        audio_size = int(
-            manifest_soup.select_one("AdaptationSet[contentType='audio'] Representation").attrs['FBContentLength'])
-        full_size = video_size + audio_size
-
-        return cls(video_title, video_url, video_preview_url, video_duration, video_quality, full_size, video_author)
+def find_video_item(value, shortcode):
+    if isinstance(value, dict):
+        if value.get("code") == shortcode and any(v.get("url") for v in value.get("video_versions") or []):
+            return value
+        children = value.values()
+    elif isinstance(value, list):
+        children = value
+    else:
+        return None
+    for child in children:
+        found = find_video_item(child, shortcode)
+        if found:
+            return found
 
 
 class InstagramParser(BaseParser):
@@ -84,7 +94,7 @@ class InstagramParser(BaseParser):
                 response.raise_for_status()
                 response_text = await response.text()
 
-            video = self._parse_video_attributes(response_text)
+            video = self._parse_video_attributes(response_text, self.url)
             download_path = Path(settings.DOWNLOAD_FOLDER) / video.author / f"{task_id}_video_{video.title}"
             download_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -104,8 +114,12 @@ class InstagramParser(BaseParser):
                 if is_audio_only:
                     temp_path = download_path.with_suffix('.temp')
 
+                task.filepath = temp_path
+                await redis_cache.set_download_task(task)
                 async with aiofiles.open(temp_path, 'wb') as f:
                     while True:
+                        if await redis_cache.is_task_canceled(task_id):
+                            raise DownloadUserCanceledException()
                         chunk = await response.content.read(8192)  # читаем по 8 КБ
                         if not chunk:
                             break
@@ -144,7 +158,7 @@ class InstagramParser(BaseParser):
         await redis_cache.set_download_task(task)
 
     @staticmethod
-    def _parse_video_attributes(content: str) -> InstagramVideo:
+    def _parse_video_attributes(content: str, requested_url: str = "") -> InstagramVideo:
         soup = BeautifulSoup(content, features="lxml")
 
         canonical_tag = soup.select_one("link[rel='canonical']")
@@ -154,35 +168,21 @@ class InstagramParser(BaseParser):
             og_url_tag = soup.select_one("meta[property='og:url']")
             canonical_url = og_url_tag.get("content", "") if og_url_tag and og_url_tag.get("content") else ""
 
-        shortcode = None
-        if canonical_url:
-            parts = [p for p in canonical_url.split('/') if p]
-            for i, p in enumerate(parts):
-                if p in ("reel", "reels", "p"):
-                    if i + 1 < len(parts):
-                        shortcode = parts[i + 1]
-                    break
+        match = re.search(r"/(?:reels?|p)/([A-Za-z0-9_-]+)(?:[/?#]|$)", requested_url)
+        if not match:
+            match = re.search(r"/(?:reels?|p)/([A-Za-z0-9_-]+)(?:[/?#]|$)", canonical_url)
+        shortcode = match[1] if match else None
 
-        scripts = soup.select("script[type='application/json']")
-        selected = None
-        for tag in scripts:
-            txt = tag.text
-            if '"xdt_api__v1__media__shortcode__web_info"' in txt:
-                if shortcode and shortcode in txt:
-                    selected = tag
-                    break
-                if selected is None:
-                    selected = tag
-
-        if selected is not None:
+        for script in soup.select("script[type='application/json']"):
+            if not shortcode or '"video_versions"' not in script.text:
+                continue
             try:
-                json_ = json.loads(selected.text)
-                video = InstagramVideo.from_json(json_)
-                if shortcode:
-                    video.title = f"video_by_{video.author}_{shortcode}.mp4"
-                return video
-            except Exception:
-                pass
+                payload = json.loads(script.text)
+            except json.JSONDecodeError:
+                continue
+            item = find_video_item(payload, shortcode)
+            if item:
+                return InstagramVideo.from_item(item)
 
         og_video = None
         for prop in [
@@ -196,7 +196,7 @@ class InstagramParser(BaseParser):
                 break
 
         if not og_video:
-            raise ValueError("Unable to find media info JSON or og:video meta")
+            raise HTTPException(422, "Instagram не предоставил видео для этой ссылки.")
 
         og_image = soup.select_one("meta[property='og:image']")
         preview = og_image.get("content", "") if og_image else ""
@@ -235,7 +235,7 @@ class InstagramParser(BaseParser):
                 response.raise_for_status()
                 response_text = await response.text()
 
-        video = self._parse_video_attributes(response_text)
+        video = self._parse_video_attributes(response_text, self.url)
 
         if not video.size:
             try:
@@ -247,7 +247,12 @@ class InstagramParser(BaseParser):
             except Exception:
                 pass
 
-        preview_url = await save_preview_on_s3(video.preview_url, video.title, video.author)
+        preview_url = video.preview_url
+        if preview_url:
+            try:
+                preview_url = await save_preview_on_s3(preview_url, video.title, video.author)
+            except Exception:
+                logging.getLogger(__name__).warning("Could not cache Instagram preview", exc_info=True)
 
         available_formats = [
             SVideoFormat(

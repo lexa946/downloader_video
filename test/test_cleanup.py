@@ -4,6 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+import pytest_asyncio
 
 from app.config import settings
 from app.models.cache import redis_cache
@@ -11,6 +12,18 @@ from app.models.status import VideoDownloadStatus
 from app.models.types import DownloadTask
 from app.schemas.main import SVideoStatus, SVideoResponse
 from app.worker import cleanup_old_videos
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def isolated_redis_connection(monkeypatch):
+    from app.models.cache import RedisCache
+
+    client = RedisCache().redis
+    monkeypatch.setattr(redis_cache, "redis", client)
+    try:
+        yield
+    finally:
+        await client.aclose()
 
 
 @pytest.mark.asyncio

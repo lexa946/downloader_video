@@ -1,3 +1,10 @@
 download
 pg_data
 redis_data
+.env*
+.git
+.venv
+.idea
+.pytest_cache
+**/__pycache__
+**/*.pyc

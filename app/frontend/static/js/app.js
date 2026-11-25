@@ -3,6 +3,7 @@ let currentVideoData = null;
 let currentTaskId = null;
 let progressInterval = null;
 let eventSource = null;
+let saveStatusCheck = null;
 
 // DOM elements
 const videoUrlInput = document.getElementById('videoUrl');
@@ -14,7 +15,9 @@ const videoTitle = document.getElementById('videoTitle');
 const videoAuthor = document.getElementById('videoAuthor');
 const videoDuration = document.getElementById('videoDuration');
 const videoThumbnail = document.getElementById('videoThumbnail');
-const progressFill = document.getElementById('progressFill');
+const downloadPercent = document.getElementById('downloadPercent');
+const videoWorkspace = document.getElementById('videoWorkspace');
+const inspectorTitle = document.getElementById('inspectorTitle');
 const progressText = document.getElementById('progressText');
 const statusText = document.getElementById('statusText');
 const speedText = document.getElementById('speedText');
@@ -37,10 +40,6 @@ const analyzeTab = document.getElementById('analyzeTab');
 const navToggle = document.getElementById('navToggle');
 const navMenu = document.getElementById('navMenu');
 
-// History elements
-const historySection = document.getElementById('historySection');
-const historyList = document.getElementById('historyList');
-const historyEmpty = document.getElementById('historyEmpty');
 
 // Download ready elements  
 const downloadReadyContainer = document.getElementById('downloadReadyContainer');
@@ -48,30 +47,22 @@ const downloadReadyBtn = document.getElementById('downloadReadyBtn');
 
 // Clear input elements
 const clearInputBtn = document.getElementById('clearInput');
-const startTimeInput = document.getElementById('startTime');
-const endTimeInput = document.getElementById('endTime');
-const clipForm = document.getElementById('clipForm');
-const clearStartTimeBtn = document.getElementById('clearStartTime');
-const clearEndTimeBtn = document.getElementById('clearEndTime');
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
 
     setActiveNavigation();
+    restoreActiveDownload();
 
-    // Video functionality
-    if (analyzeBtn) {
-        analyzeBtn.addEventListener('click', handleAnalyzeVideo);
-    }
-    
-    if (videoUrlInput) {
-        videoUrlInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                handleAnalyzeVideo();
-            }
-        });
-    }
-    
+    analyzeTab.addEventListener('submit', event => {
+        event.preventDefault();
+        handleAnalyzeVideo();
+    });
+    searchTab.addEventListener('submit', event => {
+        event.preventDefault();
+        handleYoutubeSearch();
+    });
+
     // Navigation functionality
     if (navToggle && navMenu) {
         navToggle.addEventListener('click', toggleMobileMenu);
@@ -95,16 +86,10 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.addEventListener('click', () => switchTab(btn.dataset.tab));
         });
     }
-    // YouTube search
-    if (searchBtn && ytSearchQuery) {
-        searchBtn.addEventListener('click', handleYoutubeSearch);
-        ytSearchQuery.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') handleYoutubeSearch();
-        });
-    }
     if (clearSearchBtn && ytSearchQuery) {
         clearSearchBtn.addEventListener('click', () => {
             ytSearchQuery.value = '';
+            lastSearch = { query: '', items: [] };
             ytSearchQuery.focus();
             if (ytSearchResults) ytSearchResults.innerHTML = '';
         });
@@ -116,21 +101,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (lastUrl) {
             videoUrlInput.value = lastUrl;
         }
-        videoUrlInput.focus();
     }
     
-    // Load user history
-    loadUserHistory();
-    
-    // Обработчик кнопки скачивания готового файла
-    if (downloadReadyBtn) {
-        downloadReadyBtn.addEventListener('click', () => {
-            if (currentTaskId) {
-                console.log('Manual download triggered');
-                downloadCompletedFile();
-            }
-        });
-    }
+    document.getElementById('backToFormats').addEventListener('click', returnToFormats);
+    downloadReadyBtn.addEventListener('click', () => {
+        if (currentTaskId && saveStatusCheck !== currentTaskId) {
+            saveStatusCheck = currentTaskId;
+            checkFileDelivery(currentTaskId);
+        }
+    });
+
     // Кнопка отмены
     if (cancelBtn) {
         cancelBtn.addEventListener('click', cancelCurrentTask);
@@ -171,54 +151,34 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Utility functions
+function showFeedback(message, error = false) {
+    const feedback = document.getElementById('signal-feedback');
+    const notice = document.createElement('p');
+    notice.className = error ? 'error-message' : 'success-message';
+    if (!message) {
+        feedback.replaceChildren();
+        return;
+    }
+    notice.textContent = message;
+    if (error) notice.setAttribute('role', 'alert');
+    feedback.replaceChildren(notice);
+}
+
 function showError(message) {
-    const existingError = document.querySelector('.error-message');
-    if (existingError) {
-        existingError.remove();
-    }
-    
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-message fade-in';
-    errorDiv.textContent = message;
-    
-    const downloadSection = document.querySelector('.download-section');
-    if (downloadSection) {
-        downloadSection.appendChild(errorDiv);
-        
-        // Убираем ошибку через 5 секунд
-        setTimeout(() => {
-            if (errorDiv.parentNode) {
-                errorDiv.remove();
-            }
-        }, 5000);
-    }
+    showFeedback(message, true);
 }
 
 function showSuccess(message) {
-    const existingSuccess = document.querySelector('.success-message');
-    if (existingSuccess) {
-        existingSuccess.remove();
-    }
-    
-    const successDiv = document.createElement('div');
-    successDiv.className = 'success-message fade-in';
-    successDiv.textContent = message;
-    
-    const downloadSection = document.querySelector('.download-section');
-    if (downloadSection) {
-        downloadSection.appendChild(successDiv);
-        
-        // Убираем сообщение через 3 секунды
-        setTimeout(() => {
-            if (successDiv.parentNode) {
-                successDiv.remove();
-            }
-        }, 3000);
-    }
+    showFeedback(message);
 }
 
 function switchTab(tab) {
-    tabButtons.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    ytSearchResults.hidden = tab !== 'search';
+    tabButtons.forEach(button => {
+        const active = button.dataset.tab === tab;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+    });
     if (tab === 'search') {
         if (searchTab) searchTab.style.display = 'block';
         if (analyzeTab) analyzeTab.style.display = 'none';
@@ -237,22 +197,16 @@ function validateUrl(url) {
         return 'Пожалуйста, введите ссылку на видео';
     }
     
-    const supportedPlatforms = [
-        'youtube.com', 'youtu.be', 'www.youtube.com',
-        'instagram.com', 'www.instagram.com',
-        'vk.com', 'www.vk.com', 'vkvideo.ru',
-        'rutube.ru', 'www.rutube.ru',
-        'tiktok.com', 'www.tiktok.com', 'vt.tiktok.com'
-    ];
-    
-    const isSupported = supportedPlatforms.some(platform => 
-        url.toLowerCase().includes(platform)
-    );
-    
-    if (!isSupported) {
-        return 'Данная платформа не поддерживается. Поддерживаются: YouTube, Instagram*, VK, VK Video, RuTube, TikTok';
+    try {
+        const address = new URL(url);
+        const supported = /(^|\.)(youtube\.com|youtu\.be|instagram\.com|vk\.com|vkvideo\.ru)$/i;
+        if (!['http:', 'https:'].includes(address.protocol) || !supported.test(address.hostname)) {
+            return 'Вставьте ссылку на видео с YouTube, Instagram или VK.';
+        }
+    } catch {
+        return 'Проверьте адрес ссылки.';
     }
-    
+
     return null;
 }
 
@@ -280,158 +234,26 @@ function formatDuration(seconds) {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-function parseHmsToSeconds(val) {
-    if (val === undefined || val === null) return null;
-    const s = String(val).trim();
-    if (!s) return null;
-    const m = s.match(/^\d{2}:\d{2}:\d{2}$/);
-    if (!m) return null;
-    const [hh, mm, ss] = s.split(':').map(Number);
-    if (mm >= 60 || ss >= 60) return null;
-    return hh * 3600 + mm * 60 + ss;
-}
-
-function formatDigitsToHMS(digits) {
-    // Fill from right: SS, then MM, then HH
-    const raw = digits.replace(/[^0-9]/g, '').slice(-6); // keep last 6 digits
-    const pad = raw.padStart(6, '0');
-    const hh = pad.slice(0, 2);
-    let mm = pad.slice(2, 4);
-    let ss = pad.slice(4, 6);
-    // clamp to valid ranges to avoid invalid values during typing
-    if (Number(mm) > 59) mm = '59';
-    if (Number(ss) > 59) ss = '59';
-    return `${hh}:${mm}:${ss}`;
-}
-
-function attachHMSBehavior(input) {
-    if (!input) return;
-    // keep a separate buffer of digits per input
-    const ensureBuffer = () => {
-        if (typeof input.dataset.dbuf !== 'string') input.dataset.dbuf = '';
-    };
-    const renderFromBuffer = () => {
-        const formatted = formatDigitsToHMS(input.dataset.dbuf || '');
-        input.value = formatted;
-        try { input.setSelectionRange(formatted.length, formatted.length); } catch (_) {}
-    };
-    const initFromValue = () => {
-        const digits = (input.value || '').replace(/[^0-9]/g, '');
-        input.dataset.dbuf = digits.slice(-6);
-        renderFromBuffer();
-    };
-
-    ensureBuffer();
-    initFromValue();
-
-    input.addEventListener('keydown', (e) => {
-        ensureBuffer();
-        // allow navigation keys
-        const navKeys = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Tab','Home','End'];
-        if (navKeys.includes(e.key)) return;
-        if (e.key === 'Backspace') {
-            e.preventDefault();
-            // remove last digit (rightmost)
-            input.dataset.dbuf = (input.dataset.dbuf || '').slice(0, -1);
-            renderFromBuffer();
-            return;
-        }
-        if (e.key === 'Delete') {
-            e.preventDefault();
-            // behave same as backspace for simplicity
-            input.dataset.dbuf = (input.dataset.dbuf || '').slice(0, -1);
-            renderFromBuffer();
-            return;
-        }
-        if (/^[0-9]$/.test(e.key)) {
-            e.preventDefault();
-            const cur = (input.dataset.dbuf || '') + e.key;
-            // keep last 6 digits only
-            input.dataset.dbuf = cur.slice(-6);
-            renderFromBuffer();
-            return;
-        }
-        // block any other input
-        e.preventDefault();
-    });
-
-    input.addEventListener('input', () => {
-        // In case some browsers still emit input, normalize back to buffer rendering
-        renderFromBuffer();
-    });
-    input.addEventListener('paste', (e) => {
-        e.preventDefault();
-        const text = (e.clipboardData || window.clipboardData).getData('text');
-        const digits = text.replace(/[^0-9]/g, '');
-        input.dataset.dbuf = digits.slice(-6);
-        renderFromBuffer();
-    });
-    input.addEventListener('keypress', (e) => {
-        // allow digits only; colon is managed by formatter
-        if (!/[0-9]/.test(e.key)) {
-            e.preventDefault();
-        }
-    });
-    input.addEventListener('blur', () => {
-        // if user left partially filled (like 12:3:), reformat/correct
-        renderFromBuffer();
-    });
-}
-
-attachHMSBehavior(startTimeInput);
-attachHMSBehavior(endTimeInput);
-
-// Toggle clip form visibility with slide effect via CSS class
-if (clipForm) {
-    // use details/open to drive state; animate via CSS if needed
-    const syncOpen = () => {
-        clipForm.dataset.open = clipForm.open ? 'true' : 'false';
-    };
-    clipForm.addEventListener('toggle', syncOpen);
-    syncOpen();
-}
-
-// Clear buttons for time inputs
-if (clearStartTimeBtn && startTimeInput) {
-    clearStartTimeBtn.addEventListener('click', () => {
-        // reset buffer and visual to 00:00:00
-        startTimeInput.dataset.dbuf = '';
-        startTimeInput.value = '00:00:00';
-        startTimeInput.focus();
-        try { startTimeInput.setSelectionRange(startTimeInput.value.length, startTimeInput.value.length); } catch(_) {}
-    });
-}
-if (clearEndTimeBtn && endTimeInput) {
-    clearEndTimeBtn.addEventListener('click', () => {
-        endTimeInput.dataset.dbuf = '';
-        endTimeInput.value = '00:00:00';
-        endTimeInput.focus();
-        try { endTimeInput.setSelectionRange(endTimeInput.value.length, endTimeInput.value.length); } catch(_) {}
-    });
-}
-
 function setButtonLoading(button, isLoading) {
-    if (!button) return;
-    
-    const btnText = button.querySelector('.btn-text');
-    const btnLoader = button.querySelector('.btn-loader');
-    
-    if (btnText && btnLoader) {
-        if (isLoading) {
-            btnText.style.display = 'none';
-            btnLoader.style.display = 'inline';
-            button.disabled = true;
-        } else {
-            btnText.style.display = 'inline';
-            btnLoader.style.display = 'none';
-            button.disabled = false;
-        }
+    button.disabled = isLoading;
+    button.setAttribute('aria-busy', String(isLoading));
+    const status = document.getElementById('request-status');
+    if (isLoading) {
+        status.dataset.request = button.id;
+        status.textContent = button === analyzeBtn ? 'Получаем форматы видео' : 'Ищем ролики на YouTube';
+    } else if (status.dataset.request === button.id) {
+        status.textContent = '';
     }
 }
 
 // Main functions
 async function handleAnalyzeVideo() {
-    if (!videoUrlInput) return;
+    if (!videoUrlInput || analyzeBtn.disabled) return;
+    if (!progressSection.hidden && downloadReadyContainer.hidden) {
+        showSuccess('Дождитесь завершения или отмените текущую загрузку.');
+        cancelBtn.focus();
+        return;
+    }
     
     const url = videoUrlInput.value.trim();
     
@@ -446,10 +268,10 @@ async function handleAnalyzeVideo() {
     localStorage.setItem('lastVideoUrl', url);
     
     // Показываем загрузку
+    showSuccess('');
     setButtonLoading(analyzeBtn, true);
     hideResults();
-    hideProgress();
-    
+
     try {
         const response = await fetch('/api/get-formats', {
             method: 'POST',
@@ -468,10 +290,11 @@ async function handleAnalyzeVideo() {
         currentVideoData = videoData;
         
         displayVideoInfo(videoData);
-        displayFormats(videoData.formats);
+        displayFormats(videoData.formats.filter(format => format.video_format_id));
         showResults();
         
-        showSuccess('Форматы видео успешно получены!');
+        showSuccess('');
+        videoTitle.focus();
         
     } catch (error) {
         console.error('Error analyzing video:', error);
@@ -487,6 +310,8 @@ async function handleYoutubeSearch() {
         showError('Введите поисковый запрос');
         return;
     }
+    if (searchBtn.disabled) return;
+    showSuccess('');
     setButtonLoading(searchBtn, true);
     if (ytSearchResults) ytSearchResults.innerHTML = '';
     try {
@@ -512,46 +337,24 @@ function renderYoutubeSearchResults(items) {
         return;
     }
     ytSearchResults.innerHTML = '';
-    items.forEach(item => {
+    items.slice(0, 6).forEach(item => {
         const div = document.createElement('div');
         div.className = 'format-item yt-result';
-        const thumb = item.thumbnail_url ? `<img loading="lazy" src="${item.thumbnail_url}" alt="Preview" class="yt-thumb" onerror="this.style.display='none'">` : '';
-        const duration = item.duration ? `<div class="yt-duration">${formatDuration(item.duration)}</div>` : '';
-        const author = item.author ? `<div class="yt-author">${item.author}</div>` : '';
-        div.innerHTML = `
-            ${thumb}
-            <div class="yt-title">${item.title || ''}</div>
-            ${author}
-            ${duration}
-            <button type="button" class="download-format-btn yt-open-btn" data-url="${item.video_url}">Открыть</button>
-        `;
-        const openBtn = div.querySelector('button');
-        openBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (videoUrlInput) {
-                videoUrlInput.value = item.video_url;
-                localStorage.setItem('lastVideoUrl', item.video_url);
-                // переключаем на вкладку форматов
-                switchTab('analyze');
-                handleAnalyzeVideo();
-                // не очищаем результаты, чтобы сохранить выдачу
-                resultsSection.scrollIntoView({behavior: 'smooth'});
-            } else {
-                window.open(item.video_url, '_blank');
-            }
+        if (item.thumbnail_url) div.append(mediaThumbnail(item.thumbnail_url, 'yt-thumb'));
+        const title = document.createElement('strong');
+        title.className = 'yt-title';
+        title.textContent = item.title || 'Без названия';
+        const meta = document.createElement('span');
+        meta.textContent = [item.author, item.duration && formatDuration(item.duration)].filter(Boolean).join(' · ');
+        const open = document.createElement('button');
+        open.textContent = 'Открыть';
+        open.addEventListener('click', () => {
+            switchTab('analyze');
+            videoUrlInput.value = item.video_url;
+            handleAnalyzeVideo();
         });
-        // click anywhere selects
-        div.addEventListener('click', (e) => {
-            if (e.target.tagName.toLowerCase() === 'button') return;
-            if (videoUrlInput) {
-                videoUrlInput.value = item.video_url;
-                localStorage.setItem('lastVideoUrl', item.video_url);
-                switchTab('analyze');
-                handleAnalyzeVideo();
-                resultsSection.scrollIntoView({behavior: 'smooth'});
-            }
-        });
+        meta.className = 'yt-meta';
+        div.append(title, meta, open);
         ytSearchResults.appendChild(div);
     });
 }
@@ -576,58 +379,32 @@ function displayFormats(formats) {
     formatsList.innerHTML = '';
     
     if (!formats || formats.length === 0) {
-        formatsList.innerHTML = '<p>Форматы не найдены</p>';
+        formatsList.innerHTML = '<p>Для этой ссылки нет доступных видеоформатов.</p>';
         return;
     }
     
-    // Сортируем форматы по качеству (сначала лучшие)
-    const sortedFormats = formats.sort((a, b) => {
-        const qualityOrder = {
-            '2160p': 6, '1440p': 5, '1080p': 4, 
-            '720p': 3, '480p': 2, '360p': 1, '240p': 0
-        };
-        
-        const aQuality = qualityOrder[a.quality] || -1;
-        const bQuality = qualityOrder[b.quality] || -1;
-        
-        return bQuality - aQuality;
+    const label = document.createElement('label');
+    label.textContent = 'Качество';
+    const select = document.createElement('select');
+    formats.forEach((format, index) => {
+        const quality = format.quality === 'unknown' ? 'Исходное качество' : format.quality;
+        const size = format.filesize ? ' · ' + formatFileSize(format.filesize) : '';
+        select.add(new Option(quality + size, index));
     });
-    
-    sortedFormats.forEach(format => {
-        const formatElement = createFormatElement(format);
-        formatsList.appendChild(formatElement);
+    label.append(select);
+    const download = document.createElement('button');
+    download.className = 'primary';
+    download.textContent = 'Скачать';
+    download.addEventListener('click', async () => {
+        const format = formats[Number(select.value)];
+        download.disabled = true;
+        try {
+            await startDownload(format.video_format_id, format.audio_format_id);
+        } finally {
+            download.disabled = false;
+        }
     });
-}
-
-function createFormatElement(format) {
-    const formatDiv = document.createElement('div');
-    formatDiv.className = 'format-item';
-    
-    const isAudioOnly = format.quality.toLowerCase().includes('audio') || 
-                       format.quality.toLowerCase().includes('mp3');
-    
-    const qualityDisplay = isAudioOnly ? 
-        `🎵 ${format.quality} (Только аудио)` : 
-        `🎥 ${format.quality}`;
-    
-    formatDiv.innerHTML = `
-        <div class="format-quality">${qualityDisplay}</div>
-        ${format.filesize && format.filesize > 0 ? `<div class="format-size">${formatFileSize(format.filesize)}</div>` : ''}
-        <button class="download-format-btn" onclick="startDownload('${format.video_format_id}', '${format.audio_format_id}')">
-            ${isAudioOnly ? 'Скачать аудио' : 'Скачать видео'}
-        </button>
-    `;
-    
-    // Добавляем клик на всю карточку
-    formatDiv.addEventListener('click', (e) => {
-        // Не срабатывает если кликнули по кнопке
-        if (e.target.classList.contains('download-format-btn')) return;
-        
-        // Вызываем ту же логику что и кнопка
-        startDownload(format.video_format_id, format.audio_format_id);
-    });
-    
-    return formatDiv;
+    formatsList.append(label, download);
 }
 
 async function startDownload(videoFormatId, audioFormatId) {
@@ -635,49 +412,11 @@ async function startDownload(videoFormatId, audioFormatId) {
         showError('Данные о видео не найдены. Попробуйте заново получить форматы.');
         return;
     }
-    const clipEnabled = clipForm && clipForm.dataset.open === 'true';
-    const rawStart = startTimeInput ? startTimeInput.value.trim() : '';
-    const rawEnd = endTimeInput ? endTimeInput.value.trim() : '';
-    const start_seconds = clipEnabled && rawStart ? parseHmsToSeconds(rawStart) : null;
-    const end_seconds = clipEnabled && rawEnd ? parseHmsToSeconds(rawEnd) : null;
-
-    if (clipEnabled) {
-        if (rawStart && start_seconds == null) {
-            showError('Неверный формат начала. Используйте ЧЧ:ММ:СС');
-            return;
-        }
-        if (rawEnd && end_seconds == null) {
-            showError('Неверный формат конца. Используйте ЧЧ:ММ:СС');
-            return;
-        }
-        if (start_seconds != null && end_seconds != null && end_seconds <= start_seconds) {
-            showError('Конец должен быть позже начала');
-            return;
-        }
-
-        const duration = currentVideoData && typeof currentVideoData.duration === 'number' ? currentVideoData.duration : null;
-        if (duration != null) {
-            if (start_seconds != null && start_seconds > duration) {
-                showError('Начало выходит за пределы длительности видео');
-                return;
-            }
-            if (end_seconds != null && end_seconds > duration) {
-                showError('Конец выходит за пределы длительности видео');
-                return;
-            }
-        }
-    }
-
     const downloadData = {
         url: currentVideoData.url,
         video_format_id: videoFormatId,
-        audio_format_id: audioFormatId,
-        start_seconds: start_seconds,
-        end_seconds: end_seconds
+        audio_format_id: audioFormatId
     };
-    if (downloadData.start_seconds == null) delete downloadData.start_seconds;
-    if (downloadData.end_seconds == null) delete downloadData.end_seconds;
-    
     try {
         const response = await fetch('/api/start-download', {
             method: 'POST',
@@ -687,19 +426,16 @@ async function startDownload(videoFormatId, audioFormatId) {
             body: JSON.stringify(downloadData)
         });
         
+        if (response.status === 409) await restoreActiveDownload();
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || `Ошибка ${response.status}: ${response.statusText}`);
         }
         
         const statusData = await response.json();
-        currentTaskId = statusData.task_id;
-        await loadUserHistory();
-        showProgress();
-        hideResults();
-        startProgressTracking();
-
-        showSuccess('Скачивание началось!');
+        trackDownload(statusData);
+        cancelBtn.focus();
+        showSuccess('');
         
     } catch (error) {
         console.error('Error starting download:', error);
@@ -707,172 +443,120 @@ async function startDownload(videoFormatId, audioFormatId) {
     }
 }
 
-function startProgressTracking() {
-    // Cleanup previous trackers
-    if (eventSource) {
-        eventSource.close();
-        eventSource = null;
-    }
-    if (progressInterval) {
-        clearInterval(progressInterval);
-        progressInterval = null;
-    }
-    // Prefer SSE if available
-    if (window.EventSource) {
-        startSSE();
-    } else {
-        startPollingFallback();
-    }
-    if (cancelBtn) {
-        cancelBtn.disabled = false;
-        cancelBtn.style.display = 'inline-block';
+async function restoreActiveDownload() {
+    try {
+        const response = await fetch('/api/active-download', {cache: 'no-store'});
+        if (!response.ok) return;
+        const task = await response.json();
+        if (task && !currentTaskId) trackDownload(task);
+    } catch (error) {
+        console.error('Could not restore active download:', error);
     }
 }
 
-function startSSE() {
-    if (!currentTaskId) return;
-    const url = `/api/download-events/${currentTaskId}`;
-    eventSource = new EventSource(url);
+function stopProgressTracking() {
+    eventSource?.close();
+    eventSource = null;
+    clearInterval(progressInterval);
+    progressInterval = null;
+}
 
-    eventSource.onmessage = (e) => {
-        try {
-            const statusData = JSON.parse(e.data);
-            updateProgressDisplay(statusData);
-            if (statusData.status === 'completed') {
-                if (downloadReadyContainer) {
-                    downloadReadyContainer.style.display = 'block';
-                }
-                if (eventSource) {
-                    eventSource.close();
-                    eventSource = null;
-                }
-                loadUserHistory();
-                hideProgress();
-                if (cancelBtn) cancelBtn.style.display = 'none';
-            } else if (statusData.status === 'canceled') {
-                if (eventSource) {
-                    eventSource.close();
-                    eventSource = null;
-                }
-                showError('Загрузка отменена');
-                hideProgress();
-                showResults();
-                if (cancelBtn) cancelBtn.style.display = 'none';
-                loadUserHistory();
-            } else if (statusData.status === 'error') {
-                if (eventSource) {
-                    eventSource.close();
-                    eventSource = null;
-                }
-                showError(statusData.description || 'Произошла ошибка при скачивании');
-                hideProgress();
-                showResults();
-                if (cancelBtn) cancelBtn.style.display = 'none';
-            }
-        } catch (err) {
-            console.error('SSE parse error:', err);
-        }
+function trackDownload(task) {
+    stopProgressTracking();
+    currentTaskId = task.task_id;
+    if (task.video && currentVideoData?.url !== task.video.url) {
+        currentVideoData = task.video;
+        displayVideoInfo(task.video);
+        displayFormats(task.video.formats.filter(format => format.video_format_id));
+    }
+    downloadPercent.value = 0;
+    downloadReadyContainer.hidden = true;
+    cancelBtn.hidden = false;
+    cancelBtn.disabled = false;
+    showProgress();
+    updateProgressDisplay(task);
+
+    if (!window.EventSource) {
+        startPollingFallback();
+        return;
+    }
+
+    const source = new EventSource('/api/download-events/' + task.task_id);
+    eventSource = source;
+    source.onmessage = event => {
+        if (eventSource === source) applyTaskStatus(JSON.parse(event.data));
     };
-
-    eventSource.onerror = () => {
-        if (eventSource) {
-            eventSource.close();
-            eventSource = null;
-        }
+    source.onerror = () => {
+        if (eventSource !== source) return;
+        source.close();
+        eventSource = null;
         startPollingFallback();
     };
+}
+
+function applyTaskStatus(task) {
+    if (task.task_id !== currentTaskId) return;
+    if (task.status === 'pending') {
+        updateProgressDisplay(task);
+        return;
+    }
+    stopProgressTracking();
+    if (task.status === 'completed') {
+        updateProgressDisplay(task);
+        inspectorTitle.textContent = 'Файл готов';
+        cancelBtn.hidden = true;
+        downloadReadyBtn.href = '/api/get-video/' + task.task_id;
+        downloadReadyContainer.hidden = false;
+        if (progressSection.contains(document.activeElement) || document.activeElement === document.body) {
+            downloadReadyBtn.focus();
+        }
+        return;
+    }
+
+    currentTaskId = null;
+    if (currentVideoData) showResults();
+    if (task.status === 'error') showError(task.description || 'Ошибка при скачивании');
+    else if (task.status === 'canceled') showSuccess('Загрузка отменена.');
 }
 
 function startPollingFallback() {
-    progressInterval = setInterval(checkDownloadProgress, 1000);
-    checkDownloadProgress(); // Первая проверка сразу
+    if (progressInterval) return;
+    progressInterval = setInterval(checkDownloadProgress, 2000);
+    checkDownloadProgress();
 }
 
 async function checkDownloadProgress() {
-    if (!currentTaskId) return;
-    
+    const taskId = currentTaskId;
+    if (!taskId) return;
     try {
-        const response = await fetch(`/api/download-status/${currentTaskId}`);
-        
-        if (!response.ok) {
-            throw new Error(`Ошибка ${response.status}: ${response.statusText}`);
-        }
-        
-        const statusData = await response.json();
-        
-        updateProgressDisplay(statusData);
-        console.log(statusData.status)
-        if (statusData.status === 'completed') {
-            clearInterval(progressInterval);
-            progressInterval = null;
-            console.log('Video completed download.');
-            if (downloadReadyContainer) {
-                downloadReadyContainer.style.display = 'block';
-            }
-            await loadUserHistory();
-            hideProgress();
-        } else if (statusData.status === 'canceled') {
-            clearInterval(progressInterval);
-            progressInterval = null;
-            showError('Загрузка отменена');
-            hideProgress();
-            showResults();
-            await loadUserHistory();
-        } else if (statusData.status === 'error') {
-            clearInterval(progressInterval);
-            progressInterval = null;
-            showError(statusData.description || 'Произошла ошибка при скачивании');
-            hideProgress();
-            showResults();
-        }
+        const response = await fetch('/api/download-status/' + taskId);
+        if (taskId !== currentTaskId) return;
+        if (response.ok) applyTaskStatus(await response.json());
+        else if (response.status === 404) applyTaskStatus({task_id: taskId, status: 'error', description: 'Загрузка больше недоступна.'});
     } catch (error) {
-        console.error('Error checking progress:', error);
-        clearInterval(progressInterval);
-        progressInterval = null;
-        showError(`Ошибка при проверке статуса: ${error.message}`);
+        console.error('Could not refresh download status:', error);
     }
 }
 
-function updateProgressDisplay(statusData) {
-    const percent = Math.round(statusData.percent || 0);
-    
-    if (progressFill) progressFill.style.width = `${percent}%`;
-    if (progressText) progressText.textContent = `${percent}%`;
-    
-    const statusMessages = {
-        'pending': 'Подготовка к скачиванию...',
-        'downloading': 'Скачивание видео...',
-        'processing': 'Обработка файла...',
-        'completed': 'Скачивание завершено!',
-        'error': 'Произошла ошибка',
-        'canceled': 'Отменено пользователем'
+function updateProgressDisplay(task) {
+    const ready = task.status === 'completed';
+    const progress = Math.round(Number(task.percent) || 0);
+    const percent = ready ? 100 : Math.min(99, Math.max(downloadPercent.value, progress));
+    downloadPercent.value = percent;
+    progressSection.style.setProperty('--download-angle', percent * 3.6 + 'deg');
+    progressText.textContent = percent + '%';
+    const stages = {
+        'Downloading video track': 'Скачиваем видео',
+        'Downloading audio track': 'Скачиваем звук',
+        'Merging tracks': 'Собираем файл',
+        'Merging parts': 'Собираем файл',
     };
-    
-    if (statusText) {
-        statusText.textContent = statusData.description || 
-                                statusMessages[statusData.status] || 
-                                'Выполняется...';
-    }
-
-    // speed/eta
-    if (speedText) {
-        const bps = statusData.speed_bps || 0;
-        if (bps > 0) {
-            speedText.textContent = `Скорость: ${formatSpeed(bps)}`;
-            speedText.style.display = 'block';
-        } else {
-            speedText.style.display = 'none';
-        }
-    }
-    if (etaText) {
-        const eta = statusData.eta_seconds;
-        if (typeof eta === 'number' && eta >= 0) {
-            etaText.textContent = `Осталось: ${formatEta(eta)}`;
-            etaText.style.display = 'block';
-        } else {
-            etaText.style.display = 'none';
-        }
-    }
+    const label = ready ? 'Готово к сохранению' : stages[task.description] || 'Подготавливаем загрузку';
+    if (statusText.textContent !== label) statusText.textContent = label;
+    speedText.hidden = ready || !(task.speed_bps > 0);
+    etaText.hidden = ready || task.eta_seconds == null || task.eta_seconds < 0;
+    if (!speedText.hidden) speedText.textContent = formatSpeed(task.speed_bps);
+    if (!etaText.hidden) etaText.textContent = 'Осталось ' + formatEta(task.eta_seconds);
 }
 
 function formatSpeed(bps) {
@@ -894,88 +578,75 @@ function formatEta(seconds) {
 }
 
 async function cancelCurrentTask() {
-    if (!currentTaskId) return;
+    const taskId = currentTaskId;
+    if (!taskId) return;
+    cancelBtn.disabled = true;
     try {
-        const response = await fetch(`/api/cancel/${currentTaskId}`, {
-            method: 'POST'
-        });
+        const response = await fetch('/api/cancel/' + taskId, {method: 'POST'});
+        if (response.status === 409) {
+            await checkDownloadProgress();
+            return;
+        }
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
             throw new Error(data.detail || 'Не удалось отменить загрузку');
         }
-        showSuccess('Отменяем загрузку...');
-        if (eventSource) {
-            eventSource.close();
-            eventSource = null;
-        }
-        hideProgress();
-        showResults();
-        if (cancelBtn) cancelBtn.style.display = 'none';
-        await loadUserHistory();
-    } catch (e) {
-        showError(e.message || 'Ошибка при отмене');
+        applyTaskStatus({task_id: taskId, status: 'canceled'});
+    } catch (error) {
+        showError(error.message || 'Ошибка при отмене');
+    } finally {
+        cancelBtn.disabled = false;
     }
 }
 
-async function downloadCompletedFile() {
-    if (!currentTaskId) {
-        console.error('No currentTaskId for download');
-        return;
-    }
-    
-    console.log(`Starting automatic download for task: ${currentTaskId}`);
-    
+function returnToFormats() {
+    currentTaskId = null;
+    saveStatusCheck = null;
+    const shouldMoveFocus = progressSection.contains(document.activeElement);
+    showResults();
+    if (shouldMoveFocus) formatsList.querySelector('select')?.focus();
+}
+
+async function checkFileDelivery(taskId) {
+    const isCurrent = () => saveStatusCheck === taskId && currentTaskId === taskId && !videoWorkspace.hidden && !progressSection.hidden;
     try {
-         const downloadUrl = `/api/get-video/${currentTaskId}`;
-
-
-        console.log('Trying direct link method...');
-        window.open(downloadUrl, '_blank');
-
-        showSuccess('Файл готов к скачиванию! Проверьте загрузки браузера.');
-
-        
-        // Показываем возможность скачать снова
-        setTimeout(() => {
-            showResults();
-            downloadReadyContainer.style.display = 'none';
-        }, 2000);
-        
+        const response = await fetch('/api/download-status/' + taskId, {cache: 'no-store'});
+        if (response.ok && (await response.json()).status === 'done' && isCurrent()) {
+            returnToFormats();
+            return;
+        }
+        if (response.status === 404) {
+            if (saveStatusCheck === taskId) saveStatusCheck = null;
+            return;
+        }
     } catch (error) {
-        console.error('Error downloading file:', error);
-        showError(`Ошибка при скачивании файла: ${error.message}`);
+        console.error('Could not check file delivery:', error);
+    }
+    if (isCurrent()) {
+        setTimeout(() => {
+            if (isCurrent()) checkFileDelivery(taskId);
+        }, 1500);
     }
 }
 
 function showResults() {
-    if (resultsSection) {
-        resultsSection.style.display = 'block';
-        resultsSection.classList.add('fade-in');
-    }
+    saveStatusCheck = null;
+    videoWorkspace.hidden = false;
+    inspectorTitle.textContent = 'Параметры файла';
+    progressSection.hidden = true;
+    resultsSection.hidden = false;
 }
 
 function hideResults() {
-    if (resultsSection) {
-        resultsSection.style.display = 'none';
-        resultsSection.classList.remove('fade-in');
-    }
-    if (downloadReadyContainer) {
-        downloadReadyContainer.style.display = 'none';
-    }
+    saveStatusCheck = null;
+    videoWorkspace.hidden = true;
 }
 
 function showProgress() {
-    if (progressSection) {
-        progressSection.style.display = 'block';
-        progressSection.classList.add('fade-in');
-    }
-}
-
-function hideProgress() {
-    if (progressSection) {
-        progressSection.style.display = 'none';
-        progressSection.classList.remove('fade-in');
-    }
+    videoWorkspace.hidden = false;
+    inspectorTitle.textContent = 'Загрузка файла';
+    resultsSection.hidden = true;
+    progressSection.hidden = false;
 }
 
 // Cleanup on page unload
@@ -1051,285 +722,13 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// History functions
-function getUserId() {
-    // Get user_id from cookies
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-        const [name, value] = cookie.trim().split('=');
-        if (name === 'user_id') {
-            return value;
-        }
-    }
-    return null;
-}
 
-async function loadUserHistory() {
-    const userId = getUserId();
-    if (!userId || !historySection) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/user/${userId}/history`);
-        if (!response.ok) {
-            // If user not found or no history, hide section
-            if (response.status === 404) {
-                return;
-            }
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const historyData = await response.json();
-        
-        if (historyData.history && historyData.history.length > 0) {
-            const history = historyData.history;
-            displayHistory(history);
-            if (historySection) {
-                historySection.style.display = 'block';
-                historySection.classList.add('fade-in');
-            }
-        } else {
-            historySection.style.display = 'block';
-            historySection.classList.add('fade-in');
-            historyEmpty.style.display = 'block';
-        }
-        
-    } catch (error) {
-        console.error('Error loading history:', error);
-        // Don't show error to user for history - it's not critical
-    }
-}
-
-function displayHistory(historyItems) {
-    if (!historyList || !historyEmpty) return;
-    
-    historyList.innerHTML = '';
-    
-    if (historyItems.length === 0) {
-        historyEmpty.style.display = 'block';
-        return;
-    }
-    
-    historyEmpty.style.display = 'none';
-    
-    historyItems.forEach(item => {
-        const historyElement = createHistoryElement(item);
-        historyList.appendChild(historyElement);
-    });
-}
-
-function createHistoryElement(videoStatus) {
-    const div = document.createElement('div');
-    div.className = `history-item ${videoStatus.status}`;
-    
-    const video = videoStatus.video;
-    const statusInfo = getStatusInfo(videoStatus.status);
-    
-    div.innerHTML = `
-        <div class="history-video-info">
-            ${video.preview_url ? 
-                `<img src="${video.preview_url}" alt="Превью" class="history-thumbnail" onerror="this.style.display='none'">` : 
-                `<div class="history-thumbnail"></div>`
-            }
-            <div class="history-details">
-                <div class="history-title">${video.title || 'Без названия'}</div>
-                ${video.author ? `<div class="history-author">Автор: ${video.author}</div>` : ''}
-            </div>
-        </div>
-        
-        <div class="history-actions">
-            ${createHistoryActions(videoStatus)}
-        </div>
-    `;
-    
-    // Добавляем клик на карточку для запроса форматов
-    div.addEventListener('click', (e) => {
-        // Не срабатывает если кликнули по кнопке действия
-        if (e.target.classList.contains('history-btn') || e.target.closest('.history-actions')) return;
-        
-        // Заполняем поле ввода URL из истории
-        if (videoUrlInput && videoStatus.video.url) {
-            videoUrlInput.value = videoStatus.video.url;
-            localStorage.setItem('lastVideoUrl', videoStatus.video.url);
-            
-            // Запрашиваем форматы
-            handleAnalyzeVideo();
-            
-            // Скроллим к началу страницы
-            resultsSection.scrollIntoView()
-            // window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    });
-    
-    return div;
-}
-
-function getStatusInfo(status) {
-    const statusMap = {
-        'completed': { icon: '✅', text: 'Готово' },
-        'downloading': { icon: '⬇️', text: 'Скачивается' },
-        'pending': { icon: '⏳', text: 'Ожидание' },
-        'processing': { icon: '⚙️', text: 'Обработка' },
-        'error': { icon: '❌', text: 'Ошибка' },
-        'canceled': { icon: '❌', text: 'Отменено' }
-    };
-    
-    return statusMap[status] || { icon: '❓', text: 'Неизвестно' };
-}
-
-function createHistoryActions(videoStatus) {
-    let actions = '';
-
-    const status = videoStatus.status.toLowerCase();
-    
-    if (status === 'completed') {
-        actions += `
-            <button class="history-btn download" onclick="downloadHistoryFile('${videoStatus.task_id}')">
-                <span>📥</span> Скачать файл
-            </button>
-        `;
-    }
-    
-    if (status === 'error' || status === 'done' || status === 'canceled') {
-        actions += `
-            <button class="history-btn redownload" onclick="redownloadVideo('${videoStatus.video.url}')">
-                <span>🔄</span> Заново
-            </button>
-        `;
-    }
-    
-    if (status === 'pending') {
-        actions += `
-            <button class="history-btn info" onclick="resumeHistoryProgress('${videoStatus.task_id}')">
-                <span>ℹ️</span> Загрузка
-            </button>
-        `;
-    }
-    
-    return actions;
-}
-
-async function cancelHistoryTask(taskId) {
-    try {
-        const response = await fetch(`/api/cancel/${taskId}`, { method: 'POST' });
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error(data.detail || 'Не удалось отменить задачу');
-        }
-        showSuccess('Загрузка отменена');
-        await loadUserHistory();
-        if (currentTaskId === taskId) {
-            if (eventSource) { eventSource.close(); eventSource = null; }
-            hideProgress();
-            showResults();
-            if (cancelBtn) cancelBtn.style.display = 'none';
-        }
-    } catch (e) {
-        showError(e.message || 'Ошибка при отмене');
-    }
-}
-
-async function downloadHistoryFile(taskId) {
-    try {
-        // Create download link
-        const downloadUrl = `/api/get-video/${taskId}`;
-        window.open(downloadUrl, '_blank');
-        
-        showSuccess('Файл начал скачиваться!');
-        await loadUserHistory();
-        
-    } catch (error) {
-        console.error('Error downloading file:', error);
-        showError('Ошибка при скачивании файла');
-    }
-}
-
-async function redownloadVideo(videoUrl) {
-    // Fill URL input and trigger analysis
-    if (videoUrlInput) {
-        videoUrlInput.value = videoUrl;
-        
-        // Scroll to top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-        // Trigger analysis after scroll
-        setTimeout(() => {
-            handleAnalyzeVideo();
-        }, 500);
-        
-        showSuccess('Ссылка вставлена! Начинаем анализ...');
-    }
-}
-
-async function checkHistoryStatus(taskId) {
-    try {
-        const response = await fetch(`/api/download-status/${taskId}`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const statusData = await response.json();
-        const statusInfo = getStatusInfo(statusData.status);
-        const percent = Math.round(statusData.percent || 0);
-        
-        let message = `Статус: ${statusInfo.text}`;
-        if (percent > 0) {
-            message += ` (${percent}%)`;
-        }
-        if (statusData.description) {
-            message += `\n${statusData.description}`;
-        }
-        
-        alert(message);
-        
-        // Refresh history if status changed
-        await loadUserHistory();
-        
-    } catch (error) {
-        console.error('Error checking status:', error);
-        showError('Не удалось получить статус скачивания');
-    }
-}
-
-// Resume tracking of an existing task from history: show standard progress UI and keep updating
-function resumeHistoryProgress(taskId) {
-    try {
-        currentTaskId = taskId;
-        showProgress();
-        hideResults();
-        startProgressTracking();
-    } catch (error) {
-        console.error('Error resuming progress:', error);
-        showError('Не удалось возобновить отслеживание прогресса');
-    }
-}
-
-function formatDate(date) {
-    const now = new Date();
-    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
-    
-    if (diffInMinutes < 1) {
-        return 'Только что';
-    } else if (diffInMinutes < 60) {
-        return `${diffInMinutes} мин назад`;
-    } else if (diffInMinutes < 1440) { // 24 hours
-        const hours = Math.floor(diffInMinutes / 60);
-        return `${hours} ч назад`;
-    } else {
-        return date.toLocaleDateString('ru-RU', {
-            day: 'numeric',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-}
-
-// Refresh history when download completes
-function refreshHistoryOnComplete() {
-    setTimeout(() => {
-        loadUserHistory();
-    }, 1000);
+function mediaThumbnail(src, className) {
+    const image = new Image();
+    image.className = className;
+    image.alt = '';
+    image.loading = 'lazy';
+    image.addEventListener('error', () => image.remove(), {once: true});
+    image.src = src;
+    return image;
 }

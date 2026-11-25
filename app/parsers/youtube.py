@@ -3,13 +3,19 @@ import time
 import asyncio
 import aiohttp
 import json as _json
+import ssl
 
 from datetime import timedelta
+from logging import getLogger
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Callable, TypeVar
+from urllib.error import URLError
 from urllib.parse import quote_plus
 
 from fastapi import HTTPException
 from pytubefix import Stream, YouTube, StreamQuery
+from pytubefix.exceptions import MaxRetriesExceeded, VideoUnavailable
 from bs4 import BeautifulSoup
 
 from app.config import settings
@@ -24,11 +30,35 @@ from app.utils.validators_utils import fallback_background_task
 from app.utils.video_utils import save_preview_on_s3, combine_audio_and_video, convert_to_mp3
 
 
+LOG = getLogger(__name__)
+T = TypeVar("T")
+
+
+class YouTubeConnectionError(RuntimeError):
+    pass
+
+
 class YouTubeParser(BaseParser):
 
     def __init__(self, url):
         self.url = url
         self._yt = YouTube(self.url)
+
+    async def _with_connection_retry(self, operation: Callable[[], T], stage: str) -> T:
+        for attempt in range(2):
+            try:
+                return await asyncio.to_thread(operation)
+            except (URLError, ssl.SSLError, MaxRetriesExceeded) as exc:
+                reason = exc.reason if isinstance(exc, URLError) else exc
+                if not isinstance(reason, (ssl.SSLEOFError, MaxRetriesExceeded)):
+                    raise
+                if attempt == 1:
+                    LOG.warning("YouTube connection failed while %s", stage, exc_info=True)
+                    raise YouTubeConnectionError(
+                        "Не удалось получить данные от YouTube. Попробуйте ещё раз."
+                    ) from exc
+                await asyncio.sleep(0.5)
+                self._yt = YouTube(self.url)
 
     @classmethod
     async def search_videos(cls, query: str) -> list[SYoutubeSearchItem]:
@@ -77,7 +107,6 @@ class YouTubeParser(BaseParser):
 
             result_items: list[SYoutubeSearchItem] = []
 
-            upload_jobs = []
             for item in search_items:
                 url_path = (
                     item.get("navigationEndpoint", {})
@@ -118,21 +147,8 @@ class YouTubeParser(BaseParser):
                     thumbnail_url=thumbnail_url,
                 ))
 
-                if thumbnail_url:
-                    upload_jobs.append(save_preview_on_s3(thumbnail_url, title or url, (author or "youtube")))
-
-                if len(result_items) >= 30:
+                if len(result_items) >= 6:
                     break
-
-            if upload_jobs:
-                uploaded_urls = await asyncio.gather(*upload_jobs, return_exceptions=True)
-                idx = 0
-                for i, item in enumerate(result_items):
-                    if item.thumbnail_url:
-                        new_url = uploaded_urls[idx]
-                        idx += 1
-                        if isinstance(new_url, str) and new_url:
-                            item.thumbnail_url = new_url
 
             return result_items
         except Exception as e:
@@ -142,9 +158,9 @@ class YouTubeParser(BaseParser):
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
 
-        download_path = Path(settings.DOWNLOAD_FOLDER) / self._yt.author
+        download_path = Path(settings.DOWNLOAD_FOLDER) / task.video_status.video.author
         task.filepath = download_path
-        event_loop = asyncio.get_event_loop()
+        event_loop = asyncio.get_running_loop()
 
         last_t = time.time()
         last_bytes = 0
@@ -170,21 +186,38 @@ class YouTubeParser(BaseParser):
                 if await redis_cache.is_task_canceled(task_id):
                     raise DownloadUserCanceledException()
 
-            future = asyncio.run_coroutine_threadsafe(_update_and_check(), event_loop)
-            future.done()
-            if future.exception():
-                raise future.exception()
+            asyncio.run_coroutine_threadsafe(_update_and_check(), event_loop).result()
 
-        self._yt.register_on_progress_callback(post_process_hook)
+        def download_track(itag: str, track: str) -> Path:
+            nonlocal last_t, last_bytes
+            last_t = time.time()
+            last_bytes = 0
+            self._yt.register_on_progress_callback(post_process_hook)
+            stream = self._yt.streams.get_by_itag(itag)
+            if stream is None:
+                raise ValueError(f"YouTube format {itag} is no longer available.")
+
+            download_path.mkdir(parents=True, exist_ok=True)
+            with TemporaryDirectory(dir=download_path) as staging:
+                filename = stream.download(
+                    output_path=staging,
+                    filename_prefix=f"{task_id}_{track}_",
+                    timeout=30,
+                    max_retries=2,
+                )
+                if not filename:
+                    raise RuntimeError(f"YouTube returned no {track} file.")
+                source = Path(filename)
+                if source.stat().st_size == 0:
+                    raise RuntimeError(f"YouTube returned an empty {track} file.")
+                return source.replace(download_path / source.name)
 
         if not download_video.video_format_id:
             task.video_status.description = "Downloading audio track"
             await redis_cache.set_download_task(task)
-            audio_path = Path(await asyncio.to_thread(
-                self._yt.streams.get_by_itag(download_video.audio_format_id).download,
-                output_path=download_path.as_posix(),
-                filename_prefix=f"{task_id}_audio_"
-            ))
+            audio_path = await self._with_connection_retry(
+                lambda: download_track(download_video.audio_format_id, "audio"), "downloading audio"
+            )
 
             task.video_status.description = "Converting to MP3"
             await redis_cache.set_download_task(task)
@@ -200,19 +233,19 @@ class YouTubeParser(BaseParser):
             # Стандартная логика для видео
             task.video_status.description = "Downloading video track"
             await redis_cache.set_download_task(task)
-            video_path = Path(await asyncio.to_thread(
-                self._yt.streams.get_by_itag(download_video.video_format_id).download,
-                output_path=download_path.as_posix(),
-                filename_prefix=f"{task_id}_video_"
-            ))
+            video_path = await self._with_connection_retry(
+                lambda: download_track(download_video.video_format_id, "video"), "downloading video"
+            )
             if download_video.audio_format_id != download_video.video_format_id:
                 task.video_status.description = "Downloading audio track"
                 await redis_cache.set_download_task(task)
-                audio_path = Path(await asyncio.to_thread(
-                    self._yt.streams.get_by_itag(download_video.audio_format_id).download,
-                    output_path=download_path.as_posix(),
-                    filename_prefix=f"{task_id}_audio_"
-                ))
+                try:
+                    audio_path = await self._with_connection_retry(
+                        lambda: download_track(download_video.audio_format_id, "audio"), "downloading audio"
+                    )
+                except YouTubeConnectionError:
+                    video_path.unlink(missing_ok=True)
+                    raise
                 task.video_status.description = "Merging tracks"
                 await redis_cache.set_download_task(task)
                 out_path = video_path.with_name(video_path.stem + "_out.mp4")
@@ -238,11 +271,11 @@ class YouTubeParser(BaseParser):
         return (
                 stream.type == "video" and
                 stream.video_codec.startswith("avc1") and
-                stream.height > settings.MIN_VIDEO_HEIGHT
+                stream.height >= settings.MIN_VIDEO_HEIGHT
         )
 
     @staticmethod
-    def _get_audio_stream(streams: StreamQuery) -> Stream:
+    def _get_audio_stream(streams: StreamQuery) -> Stream | None:
         main_stream = next(
             (s for s in streams if s.includes_audio_track and s.includes_video_track),
             None
@@ -250,10 +283,22 @@ class YouTubeParser(BaseParser):
         return main_stream
 
     async def get_formats(self) -> SVideoResponse:
-        streams = await asyncio.to_thread(lambda: self._yt.streams.fmt_streams)
-        audio = await asyncio.to_thread(self._get_audio_stream, streams)
+        try:
+            video = await self._with_connection_retry(self._read_formats, "reading video formats")
+        except YouTubeConnectionError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        except VideoUnavailable as exc:
+            raise HTTPException(404, "Видео недоступно на YouTube.") from exc
 
-        preview_url = await save_preview_on_s3(self._yt.thumbnail_url, self._yt.title, self._yt.author)
+        if video.preview_url:
+            video.preview_url = await save_preview_on_s3(video.preview_url, video.title, video.author)
+        return video
+
+    def _read_formats(self) -> SVideoResponse:
+        streams = self._yt.streams
+        audio = self._get_audio_stream(streams)
+        if audio is None:
+            raise HTTPException(status_code=404, detail="У этого видео нет доступной аудиодорожки.")
         duration = timedelta(milliseconds=int(audio.durationMs)).seconds
 
         # Get video formats
@@ -269,6 +314,13 @@ class YouTubeParser(BaseParser):
         ]
 
         # Add audio-only format
+        if not available_formats:
+            fallback = streams.filter(progressive=True, file_extension="mp4").order_by("resolution").last()
+            if fallback:
+                available_formats.append(SVideoFormat(
+                    quality=fallback.resolution, video_format_id=str(fallback.itag),
+                    audio_format_id=str(fallback.itag), filesize=fallback.filesize,
+                ))
         audio_format = SVideoFormat(
             quality="Audio only",
             video_format_id="",
@@ -280,7 +332,7 @@ class YouTubeParser(BaseParser):
         return SVideoResponse(
             url=self.url,
             title=self._yt.title,
-            preview_url=preview_url,
+            preview_url=self._yt.thumbnail_url,
             duration=duration,
             formats=available_formats,
             author=self._yt.author,

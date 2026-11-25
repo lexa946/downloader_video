@@ -36,7 +36,6 @@ def fallback_background_task(func):
             task.video_status.status = VideoDownloadStatus.CANCELED
             task.video_status.description = user_canceled.__doc__
             await redis_cache.set_download_task(task)
-            await redis_cache.clear_task_canceled(task_id)
         except Exception as e:
             task.video_status.status = VideoDownloadStatus.ERROR
             task.video_status.description = str(e)

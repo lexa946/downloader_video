@@ -1,11 +1,9 @@
-import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import FileResponse, HTMLResponse
 
-from app.utils.jinja_filters import ru_date
 from app.utils.validators_utils import get_user_id
 
 router = APIRouter(tags=["Фронт"])
@@ -13,14 +11,13 @@ router = APIRouter(tags=["Фронт"])
 # Настройка путей
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 templates = Jinja2Templates(directory=str(FRONTEND_DIR))
-templates.env.filters["ru_date"] = ru_date
 
 
 @router.get("/")
 @get_user_id
 async def index(request: Request):
     """Главная Страница"""
-    response = templates.TemplateResponse("parsers/index.html", context={"request": request})
+    response = templates.TemplateResponse(request, "parsers/index.html")
     return response
 
 
@@ -28,7 +25,7 @@ async def index(request: Request):
 @get_user_id
 async def youtube_downloader(request: Request):
     """Страница YouTube Downloader"""
-    response = templates.TemplateResponse("parsers/youtube-downloader.html", context={"request": request})
+    response = templates.TemplateResponse(request, "parsers/youtube-downloader.html")
     return response
 
 
@@ -36,7 +33,7 @@ async def youtube_downloader(request: Request):
 @get_user_id
 async def instagram_downloader(request: Request):
     """Страница Instagram Downloader"""
-    response = templates.TemplateResponse("parsers/instagram-downloader.html", context={"request": request})
+    response = templates.TemplateResponse(request, "parsers/instagram-downloader.html")
     return response
 
 
@@ -44,42 +41,26 @@ async def instagram_downloader(request: Request):
 @get_user_id
 async def vk_downloader(request: Request):
     """Страница VK Downloader"""
-    response = templates.TemplateResponse("parsers/vk-downloader.html", context={"request": request})
-    return response
-
-
-@router.get("/tiktok-downloader", response_class=HTMLResponse)
-@get_user_id
-async def tiktok_downloader(request: Request):
-    """Страница TikTok Downloader"""
-    response = templates.TemplateResponse("parsers/tiktok-downloader.html", context={"request": request})
-    return response
-
-
-@router.get("/rutube-downloader", response_class=HTMLResponse)
-@get_user_id
-async def rutube_downloader(request: Request):
-    """Страница RuTube Downloader"""
-    response = templates.TemplateResponse("parsers/rutube-downloader.html", context={"request": request})
+    response = templates.TemplateResponse(request, "parsers/vk-downloader.html")
     return response
 
 
 @router.get("/faq", response_class=HTMLResponse)
 async def new_faq(request: Request):
     """Страница FAQ"""
-    return templates.TemplateResponse("info/faq.html", {"request": request})
+    return templates.TemplateResponse(request, "info/faq.html")
 
 
 @router.get("/privacy", response_class=HTMLResponse)
 async def new_privacy(request: Request):
     """Страница политики конфиденциальности"""
-    return templates.TemplateResponse("info/privacy.html", {"request": request})
+    return templates.TemplateResponse(request, "info/privacy.html")
 
 
 @router.get("/terms", response_class=HTMLResponse)
 async def new_terms(request: Request):
     """Страница условий использования"""
-    return templates.TemplateResponse("info/terms.html", {"request": request})
+    return templates.TemplateResponse(request, "info/terms.html")
 
 
 @router.get("/robots.txt", response_class=FileResponse)

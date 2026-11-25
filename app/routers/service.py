@@ -1,4 +1,7 @@
+import asyncio
 import uuid
+
+from app.config import settings
 
 from logging import getLogger
 from typing import Annotated
@@ -33,51 +36,49 @@ router = APIRouter(prefix="/api", tags=["Service"])
 LOG = getLogger()
 
 
+format_slots = asyncio.Semaphore(settings.FORMAT_CONCURRENCY)
+
+
+async def load_formats(url: str) -> SVideoResponse:
+    service = VideoServicesManager.get_service(url)
+    cached = await redis_cache.get_video_meta(url)
+    if cached:
+        return cached
+    try:
+        await asyncio.wait_for(format_slots.acquire(), timeout=3)
+    except asyncio.TimeoutError:
+        raise HTTPException(503, "Сервис занят. Повторите запрос позже.", headers={"Retry-After": "3"})
+    try:
+        cached = await redis_cache.get_video_meta(url)
+        if cached:
+            return cached
+
+        metadata = await service.parser(url).get_formats()
+        if not metadata or not metadata.formats:
+            raise HTTPException(404, "Нет доступных форматов.")
+        await redis_cache.set_video_meta(url, metadata)
+        return metadata
+    finally:
+        format_slots.release()
+
+
 @router.post("/get-formats")
 async def get_video_formats(video_request: SVideoRequest) -> SVideoResponse:
-    """Получаем все доступные форматы видео"""
-    try:
-        print(f"Service: Processing URL: {video_request.url}")
+    return await load_formats(video_request.url)
 
-        # Try to get from Redis cache
-        cached_formats = await redis_cache.get_video_meta(video_request.url)
-        if cached_formats:
-            print(f"Service: Found in cache")
-            return cached_formats
 
-        service = VideoServicesManager.get_service(video_request.url)
-        print(f"Service: Using service: {service.name}")
-
-        parser_instance = service.parser(video_request.url)
-        print(f"Service: Created parser instance")
-
-        available_formats = await parser_instance.get_formats()
-
-        if not available_formats:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Can't find formats."
-            )
-        if not available_formats.formats:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No video formats available."
-            )
-
-        await redis_cache.set_video_meta(video_request.url, available_formats)
-        print(f"Service: Successfully cached and returning {len(available_formats.formats)} formats")
-        return available_formats
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Service error: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
-        )
+@router.get("/active-download")
+async def active_download(request: Request) -> SVideoStatus | None:
+    user_id = request.cookies.get("user_id")
+    if not user_id:
+        return None
+    task_id = await redis_cache.get_user_active_task(user_id)
+    if not task_id or await redis_cache.get_task_user(task_id) != user_id:
+        return None
+    task = await redis_cache.get_download_task(task_id)
+    if task and task.video_status.status == VideoDownloadStatus.PENDING:
+        return task.video_status
+    return None
 
 
 @router.post("/start-download")
@@ -96,7 +97,7 @@ async def start_download(request: Request, video_download: SVideoDownload,
                 existing = None
             if (existing is None or
                     existing.video_status.status in (VideoDownloadStatus.COMPLETED, VideoDownloadStatus.DONE,
-                                                     VideoDownloadStatus.ERROR) or
+                                                     VideoDownloadStatus.ERROR, VideoDownloadStatus.CANCELED) or
                     (existing.video_status.status == VideoDownloadStatus.PENDING and existing.download is None)):
                 await redis_cache.release_user_active_task(user_id, already_active_task)
             else:
@@ -105,12 +106,7 @@ async def start_download(request: Request, video_download: SVideoDownload,
                     detail="У вас уже есть активная загрузка. Дождитесь завершения текущей загрузки."
                 )
 
-    video_meta = await redis_cache.get_video_meta(video_download.url)
-    if not video_meta:
-        service = VideoServicesManager.get_service(video_download.url)
-        parser_instance = service.parser(video_download.url)
-        video_meta = await parser_instance.get_formats()
-        await redis_cache.set_video_meta(video_download.url, video_meta)
+    video_meta = await load_formats(video_download.url)
 
     video_status = SVideoStatus(
         task_id=task_id,
@@ -119,22 +115,15 @@ async def start_download(request: Request, video_download: SVideoDownload,
         created_at=__import__('time').time()
     )
     await redis_cache.set_download_task(DownloadTask(video_status, download=video_download))
-    await redis_cache.add_user_task(user_id, task_id)
     if user_id and user_id != "0":
         acquired = await redis_cache.acquire_user_active_task(user_id, task_id)
         if not acquired:
+            await redis_cache.delete_download_task(task_id)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="У вас уже есть активная загрузка. Дождитесь завершения текущей загрузки."
             )
         await redis_cache.set_task_user(task_id, user_id)
-        # мониторинг активности пользователя
-        try:
-            await redis_cache.set_user_activity(user_id)
-            await redis_cache.set_user_last_task(user_id, task_id)
-        except Exception:
-            pass
-
     arq = await task_queue.get()
     await arq.enqueue_job("download_video", task_id, _job_id=task_id)
     return video_status
@@ -165,6 +154,8 @@ async def download_events(request: Request, task_id: Annotated[str, Path()]):
             if task:
                 snap = {"task_id": task_id, **task.video_status.model_dump()}
                 yield f"data: {json.dumps(snap)}\n\n"
+                if snap["status"] in ("completed", "done", "error", "canceled"):
+                    return
 
             async for msg in pubsub.listen():
                 if msg.get("type") != "message":
@@ -194,21 +185,18 @@ async def download_events(request: Request, task_id: Annotated[str, Path()]):
 
 @router.post("/cancel/{task_id}")
 @check_task_id
-async def cancel_download(task_id: Annotated[str, Path()]):
+async def cancel_download(request: Request, task_id: Annotated[str, Path()]):
     """Отменяет активную загрузку."""
     task: DownloadTask = await redis_cache.get_download_task(task_id)
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
 
-    task.video_status.status = VideoDownloadStatus.CANCELED
-    task.video_status.description = "Canceled by user"
-    await redis_cache.set_download_task(task)
-    await redis_cache.set_task_canceled(task_id)
-
     user_id = await redis_cache.get_task_user(task_id)
-    if user_id:
-        await redis_cache.release_user_active_task(user_id, task_id)
-
+    if not user_id or user_id != request.cookies.get("user_id"):
+        raise HTTPException(404, "Загрузка не найдена.")
+    if not await redis_cache.cancel_pending_task(task_id):
+        raise HTTPException(409, "Эта загрузка уже завершилась.")
+    await redis_cache.release_user_active_task(user_id, task_id)
     return {"ok": True}
 
 
@@ -224,7 +212,7 @@ async def get_downloaded_video(task_id: Annotated[str, Path()]):
             detail="The file is not ready."
         )
 
-    if not task.filepath.exists():
+    if task.video_status.status != VideoDownloadStatus.COMPLETED or not task.filepath.is_file():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The file does not exist."

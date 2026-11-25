@@ -1,10 +1,12 @@
 import os
 
-from pydantic import model_validator
+from pydantic import PositiveInt, model_validator
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    WORKER_MAX_JOBS: PositiveInt = 4
+    FORMAT_CONCURRENCY: PositiveInt = 8
     DOWNLOAD_FOLDER: str
     FFMPEG_PATH: str
     MIN_VIDEO_HEIGHT: int
@@ -15,6 +17,7 @@ class Settings(BaseSettings):
     S3_SECRET_KEY: str
     S3_ENDPOINT_URL: str
     S3_BUCKET_NAME: str
+    S3_PUBLIC_URL: str | None = None
 
     # Redis settings
     REDIS_HOST: str
@@ -23,14 +26,6 @@ class Settings(BaseSettings):
     REDIS_PREFIX: str 
     REDIS_TTL: int
 
-    # Database / Admin / Security
-    DATABASE_URL: str
-    SECRET_KEY: str
-    ADMIN_EMAIL: str
-    ADMIN_USERNAME: str
-    ADMIN_PASSWORD: str
-
-
     @model_validator(mode="before")
     def set_more_field(cls, values):
         os.makedirs(values['DOWNLOAD_FOLDER'], exist_ok=True)
@@ -38,6 +33,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = '.env'
+        extra = 'ignore'
 
 
-settings = Settings()
+settings = Settings(_env_file=os.environ.get("DOWNLOADER_ENV_FILE", ".env") or None)

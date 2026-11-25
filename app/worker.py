@@ -1,6 +1,7 @@
 from arq.connections import RedisSettings
 from arq import cron
 
+import os
 import time
 from pathlib import Path
 
@@ -75,21 +76,32 @@ async def cleanup_old_videos(ctx) -> None:
 
 async def download_video(ctx, task_id: str):
     task = await redis_cache.get_download_task(task_id)
-    if not task:
+    if not task or task.video_status.status != VideoDownloadStatus.PENDING:
         return
     service = VideoServicesManager.get_service(task.video_status.video.url)
     parser = service.parser(task.video_status.video.url)
-    await parser.download(task_id, task.download)
+    try:
+        await parser.download(task_id, task.download)
+    except Exception:
+        latest = await redis_cache.get_download_task(task_id)
+        if latest and latest.video_status.status == VideoDownloadStatus.PENDING:
+            latest.video_status.status = VideoDownloadStatus.ERROR
+            latest.video_status.description = "Не удалось скачать видео. Попробуйте ещё раз."
+            await redis_cache.set_download_task(latest)
+        raise
 
 
 class WorkerSettings:
+    handle_signals = os.name != "nt"
     redis_settings = RedisSettings(
         host=settings.REDIS_HOST,
         port=settings.REDIS_PORT,
         database=settings.REDIS_DB,
     )
     functions = [download_video]
+    max_jobs = settings.WORKER_MAX_JOBS
     job_timeout = 60 * 60
+    health_check_interval = 30
 
     # Run cleanup daily at 03:00 UTC
     cron_jobs = [

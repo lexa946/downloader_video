@@ -9,16 +9,6 @@ services:
       - ./redis_data:/data
     command: redis-server --save 60 1 --loglevel warning
 
-  postgres:
-    restart: unless-stopped
-    image: postgres:16
-    env_file:
-      - .env.postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - ./pg_data:/var/lib/postgresql/data
-
   downloader_video:
     restart: unless-stopped
     build:
@@ -35,14 +25,12 @@ services:
       - DOWNLOAD_FOLDER=/downloads
     depends_on:
       - redis
-      - postgres
 
   worker:
     restart: unless-stopped
     image: downloader_video:latest
     depends_on:
       - redis
-      - postgres
     volumes:
       - ./.env:/.env:ro
       - ./app:/app:ro

@@ -1,4 +1,4 @@
-{% extends 'main/base.html' %}
+{% extends 'main/studio.html' %}
 {% block title %}
     Часто задаваемые вопросы - Video Downloader
 {% endblock %}
@@ -7,80 +7,7 @@
           content="Ответы на частые вопросы о скачивании видео с YouTube, Instagram*, VK, VK Video. Поддерживаемые форматы, качество, ограничения.">
     <meta name="keywords" content="faq, вопросы, скачать видео, помощь, поддержка">
     <link rel="canonical" href="https://downloader.pozharsite.ru/faq">
-    <style>
-    .faq-container {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 40px 20px;
-    }
 
-    .faq-item {
-        background: white;
-        border-radius: 12px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        overflow: hidden;
-    }
-
-    .faq-question {
-        padding: 20px;
-        background: #f8f9fa;
-        cursor: pointer;
-        border: none;
-        width: 100%;
-        text-align: left;
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #2c3e50;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        transition: background 0.3s ease;
-    }
-
-    .faq-question:hover {
-        background: #e9ecef;
-    }
-
-    .faq-question::after {
-        content: '+';
-        font-size: 1.5rem;
-        transition: transform 0.3s ease;
-    }
-
-    .faq-question.active::after {
-        transform: rotate(45deg);
-    }
-
-    .faq-answer {
-        padding: 0 20px;
-        max-height: 0;
-        overflow: hidden;
-        transition: all 0.3s ease;
-    }
-
-    .faq-answer.active {
-        padding: 20px;
-        max-height: 500px;
-    }
-
-    .faq-answer p {
-        color: #7f8c8d;
-        line-height: 1.6;
-        margin-bottom: 15px;
-    }
-
-    .faq-answer ul {
-        color: #7f8c8d;
-        margin-left: 20px;
-        margin-bottom: 15px;
-    }
-
-    .faq-answer ul li {
-        margin-bottom: 8px;
-    }
-
-</style>
 {% endblock %}
 
 {% block content %}
@@ -115,7 +42,6 @@
                     <li><strong>HD (720p)</strong> - хорошее качество</li>
                     <li><strong>480p, 360p, 240p</strong> - для медленного интернета</li>
                 </ul>
-                <p>Также доступно скачивание только аудио в формате MP3.</p>
             </div>
         </div>
 
@@ -162,7 +88,6 @@
                 <p>Мы предоставляем видео в следующих форматах:</p>
                 <ul>
                     <li><strong>MP4</strong> - универсальный формат для видео</li>
-                    <li><strong>MP3</strong> - для аудио файлов</li>
                 </ul>
                 <p>Все файлы оптимизированы для воспроизведения на большинстве устройств.</p>
             </div>
@@ -227,18 +152,21 @@
     <script>
     // FAQ accordion functionality
     document.querySelectorAll('.faq-question').forEach(button => {
+        button.setAttribute('aria-expanded', 'false');
         button.addEventListener('click', () => {
             const answer = button.nextElementSibling;
             const isActive = button.classList.contains('active');
 
             // Закрываем все открытые ответы
             document.querySelectorAll('.faq-question.active').forEach(activeBtn => {
+                activeBtn.setAttribute('aria-expanded', 'false');
                 activeBtn.classList.remove('active');
                 activeBtn.nextElementSibling.classList.remove('active');
             });
 
             // Открываем текущий, если он не был активен
             if (!isActive) {
+                button.setAttribute('aria-expanded', 'true');
                 button.classList.add('active');
                 answer.classList.add('active');
             }

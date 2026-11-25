@@ -9,18 +9,15 @@ from app.utils.helpers import remove_all_spec_chars
 
 
 class S3Client:
-    def __init__(self, access_key: str, secret_key: str, endpoint_url: str, bucket_name: str):
-        self.config = {
-            "access_key": access_key,
-            "secret_key": secret_key,
-            "endpoint_url": endpoint_url,
-        }
+    def __init__(self, access_key: str, secret_key: str, endpoint_url: str, bucket_name: str,
+                 public_url: str | None = None):
         self.bucket_name = bucket_name
+        self.public_url = (public_url or endpoint_url).rstrip("/")
         self.client = Minio(
-            endpoint_url.replace("http://", "").replace("https://", ""),
+            endpoint_url.removeprefix("http://").removeprefix("https://").rstrip("/"),
             access_key=access_key,
             secret_key=secret_key,
-            secure=True,
+            secure=not endpoint_url.startswith("http://"),
             http_client=urllib3.PoolManager(cert_reqs='CERT_NONE')
         )
 
@@ -43,7 +40,7 @@ class S3Client:
                 data=body,
                 length=size,
             )
-            return f"{self.config['endpoint_url']}/{self.bucket_name}/{result.object_name}"
+            return f"{self.public_url}/{self.bucket_name}/{result.object_name}"
         except S3Error as err:
             print(f"Ошибка при загрузке файла: {err}")
             return ""
@@ -64,5 +61,6 @@ s3_client = S3Client(
     access_key=settings.S3_ACCESS_KEY,
     secret_key=settings.S3_SECRET_KEY,
     endpoint_url=settings.S3_ENDPOINT_URL,
-    bucket_name=settings.S3_BUCKET_NAME
+    bucket_name=settings.S3_BUCKET_NAME,
+    public_url=settings.S3_PUBLIC_URL,
 )

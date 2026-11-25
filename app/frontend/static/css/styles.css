@@ -1908,3 +1908,23 @@ details.clip-form {
         padding: 20px;
     }
 }
+/* Download workspace */
+body { background: #142e35; color: #172d32; }
+.main { border-radius: 24px; background: #f7faf9; }
+.hero { text-align: left; padding: clamp(24px, 5vw, 64px); background: #e3f2ed; }
+.hero :is(h1,h2) { color: #123b38; font-size: clamp(2rem, 5vw, 3.75rem); line-height: 1.08; letter-spacing: -.045em; }
+.hero .subtitle { color: #365a55; margin: 14px 0 0; }
+.hero .quality-badges { justify-content: flex-start; margin-top: 16px; }
+.download-section { margin: clamp(12px, 3vw, 36px); padding: clamp(16px, 3vw, 32px); background: white; border: 1px solid #cfdfda; border-radius: 18px; }
+.tabs-parser-form { justify-content: flex-start; gap: 4px; margin-bottom: 20px; }
+.tab-btn { background: #eef4f2; color: #27483e; border: 0; border-radius: 9px; min-height: 44px; }
+.tab-btn.active, .analyze-btn, .download-ready-btn, .download-format-btn { background: #096454; color: white; border-radius: 10px; }
+.url-input { border: 1px solid #9aafa9; border-radius: 10px; }
+:where(button,input,summary,a):focus-visible { outline: 3px solid #028773; outline-offset: 3px; }
+.clip-summary { cursor: pointer; }
+@media (max-width: 640px) {
+    .download-section .clip-row { flex-wrap: wrap !important; }
+    .url-input-container { flex-direction: column; align-items: stretch; }
+    .url-input-container .input-wrapper { width: 100%; }
+    .download-section .analyze-btn { width: 100%; min-height: 44px; }
+}

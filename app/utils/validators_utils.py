@@ -2,7 +2,6 @@ import uuid
 from functools import wraps
 import inspect
 from uuid import UUID
-from shutil import rmtree
 
 from fastapi import HTTPException, Request
 from starlette import status
@@ -25,18 +24,14 @@ def fallback_background_task(func):
             if task.filepath:
                 if task.filepath.is_file():
                     task.filepath.unlink(missing_ok=True)
-                else:
-                    if self.__class__.__name__ == "VkParser":
-                        rmtree(task.filepath)
-                    elif self.__class__.__name__ == "YouTubeParser":
-                        for file in task.filepath.iterdir():
-                            if file.stem.startswith(task.video_status.task_id):
-                                file.unlink(missing_ok=True)
+                elif self.__class__.__name__ == "YouTubeParser" and task.filepath.is_dir():
+                    for file in task.filepath.iterdir():
+                        if file.is_file() and file.stem.startswith(task.video_status.task_id):
+                            file.unlink(missing_ok=True)
 
             task.video_status.status = VideoDownloadStatus.CANCELED
             task.video_status.description = user_canceled.__doc__
             await redis_cache.set_download_task(task)
-            await redis_cache.clear_task_canceled(task_id)
         except Exception as e:
             task.video_status.status = VideoDownloadStatus.ERROR
             task.video_status.description = str(e)

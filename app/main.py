@@ -1,32 +1,30 @@
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from starlette.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse
 from starlette.staticfiles import StaticFiles
-from starlette.middleware.sessions import SessionMiddleware
 
 from app.routers.service import router as service_router
-from app.routers.user import router as user_router
+from app.routers.consent import router as consent_router, has_consent
 from app.routers.front import router as new_front_router
-from app.routers.admin import router as admin_router
-from app.routers.blog import router as blog_router
-from app.config import settings
-from app.database import engine, Base
-from sqlalchemy.ext.asyncio import AsyncEngine
-from app.utils.jinja_filters import ru_date
 from app.models.cache import redis_cache
 from app.models.status import VideoDownloadStatus
 from app.models.queue import task_queue
-from fastapi.templating import Jinja2Templates
 
 app = FastAPI()
 
+@app.middleware("http")
+async def require_cookie_consent(request: Request, call_next):
+    if request.url.path.startswith("/api/") and not request.url.path.startswith("/api/cookie-consent"):
+        if not await has_consent(request):
+            return JSONResponse({"detail": "Требуется согласие на использование cookie."}, status_code=403)
+    return await call_next(request)
+
+app.include_router(consent_router)
 app.include_router(service_router)
-app.include_router(user_router)
 app.include_router(new_front_router)
-app.include_router(admin_router)
-app.include_router(blog_router)
 app.mount("/static", StaticFiles(directory="app/frontend/static"), name="static")
 
 app.add_middleware(
@@ -37,48 +35,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
-
-# Register Jinja filter
-templates = Jinja2Templates(directory="app/frontend")
-templates.env.filters["ru_date"] = ru_date
-
-
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
-    favicon_path = Path(__file__).parent / "frontend" / "static" / "images" / "favicon.png"
+    favicon_path = Path(__file__).parent / "frontend" / "static" / "images" / "favicon.svg"
     if favicon_path.exists():
-        return FileResponse(favicon_path, media_type="image/png")
+        return FileResponse(favicon_path, media_type="image/svg+xml")
 
     raise HTTPException(status_code=404, detail="Favicon not found")
 
 
 @app.on_event("startup")
 async def on_startup():
-    if isinstance(engine, AsyncEngine):
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-    from sqlalchemy import select
-    from sqlalchemy.ext.asyncio import AsyncSession
-    from passlib.hash import bcrypt
-    from app.models.admin_user import AdminUser
-    from app.database import SessionLocal
-
-    if SessionLocal is None:
-        return
-    async with SessionLocal() as session:  # type: AsyncSession
-        result = await session.execute(select(AdminUser))
-        admin = result.scalar_one_or_none()
-        if admin is None and settings.ADMIN_USERNAME and settings.ADMIN_PASSWORD:
-            admin = AdminUser(
-                username=settings.ADMIN_USERNAME,
-                email=settings.ADMIN_EMAIL or f"{settings.ADMIN_USERNAME}@example.com",
-                password_hash=bcrypt.hash(settings.ADMIN_PASSWORD),
-            )
-            session.add(admin)
-            await session.commit()
-
     try:
         tasks = await redis_cache.get_all_tasks()
         for task_id, task in tasks.items():

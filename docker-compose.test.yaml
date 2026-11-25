@@ -1,58 +1,93 @@
 name: downloader_test
+
+x-app: &app
+  image: downloader_video_test:local
+  pull_policy: never
+  init: true
+  environment:
+    DOWNLOAD_FOLDER: /downloads
+    FFMPEG_PATH: /usr/bin/ffmpeg
+    MIN_VIDEO_HEIGHT: "${TEST_MIN_VIDEO_HEIGHT:-360}"
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    REDIS_DB: "0"
+    REDIS_PREFIX: 'downloader_test:'
+    REDIS_TTL: "86400"
+    S3_ENDPOINT_URL: http://s3:8333
+    S3_PUBLIC_URL: "http://127.0.0.1:${TEST_S3_PORT:-8333}"
+    S3_BUCKET_NAME: downloader-test
+    S3_ACCESS_KEY: downloader-test
+    S3_SECRET_KEY: "${TEST_S3_SECRET_KEY:?set TEST_S3_SECRET_KEY}"
+  depends_on:
+    redis:
+      condition: service_healthy
+    s3-init:
+      condition: service_completed_successfully
+  volumes:
+    - downloads:/downloads
+
 services:
   redis:
-    container_name: downloader_redis_test
-    restart: unless-stopped
     image: redis:7-alpine
-    ports:
-      - "63799:6379"
+    command: ["redis-server", "--appendonly", "yes", "--loglevel", "warning"]
     volumes:
-      - ./redis_data:/data
-    command: redis-server --save 60 1 --loglevel warning
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
-  postgres:
-    restart: unless-stopped
-    image: postgres:16
-    env_file:
-      - .env.postgres
+  s3:
+    image: chrislusf/seaweedfs:4.51
+    command: ["mini", "-dir=/data", "-ip.bind=0.0.0.0"]
+    environment:
+      AWS_ACCESS_KEY_ID: downloader-test
+      AWS_SECRET_ACCESS_KEY: "${TEST_S3_SECRET_KEY:?set TEST_S3_SECRET_KEY}"
+      S3_BUCKET: downloader-test
     ports:
-      - "54322:5432"
+      - "127.0.0.1:${TEST_S3_PORT:-8333}:8333"
     volumes:
-      - ./pg_data:/var/lib/postgresql/data
+      - s3_data:/data
+
+  s3-init:
+    image: downloader_video_test:local
+    pull_policy: never
+    command: ["python", "/docker/init_test_s3.py"]
+    environment:
+      S3_ENDPOINT: s3:8333
+      S3_BUCKET_NAME: downloader-test
+      S3_ACCESS_KEY: downloader-test
+      S3_SECRET_KEY: "${TEST_S3_SECRET_KEY:?set TEST_S3_SECRET_KEY}"
+    depends_on:
+      s3:
+        condition: service_started
 
   downloader_video:
-    container_name: downloader_video_test
-    restart: unless-stopped
+    <<: *app
     build:
       context: .
       dockerfile: Dockerfile
-    image: downloader_video_test:latest
     ports:
-      - "8085:80"
-    volumes:
-      - ./.env:/.env:ro
-      - ./app:/app:ro
-      - downloads_test:/downloads
-    environment:
-      - DOWNLOAD_FOLDER=/downloads
-    depends_on:
-      - redis
-      - postgres
+      - "127.0.0.1:${TEST_WEB_PORT:-8085}:80"
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1/', timeout=3).close()"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 10s
 
   worker:
-    container_name: downloader_worker_test
-    restart: unless-stopped
-    image: downloader_video_test:latest
-    depends_on:
-      - redis
-      - postgres
-    volumes:
-      - ./.env:/.env:ro
-      - ./app:/app:ro
-      - downloads_test:/downloads
-    environment:
-      - DOWNLOAD_FOLDER=/downloads
+    <<: *app
     command: ["python", "-m", "arq", "app.worker.WorkerSettings"]
+    healthcheck:
+      test: ["CMD", "python", "-m", "arq", "--check", "app.worker.WorkerSettings"]
+      interval: 10s
+      timeout: 8s
+      retries: 6
+      start_period: 10s
 
 volumes:
-  downloads_test:
+  downloads:
+  redis_data:
+  s3_data:

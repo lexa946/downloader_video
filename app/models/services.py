@@ -1,57 +1,44 @@
+from urllib.parse import urlsplit
+
 from fastapi import HTTPException
 from starlette import status
 
-from app.parsers import YouTubeParser, InstagramParser, VkParser, RutubeParser, TikTokParser
+from app.parsers import YouTubeParser, InstagramParser, VkParser
 
 
 class VideoServiceBase:
     name = "VideoService"
-    key_words = list()
+    domains = ()
     parser = None
 
     @classmethod
     def match_url(cls, url: str) -> bool:
-        return any(keyword in url for keyword in cls.key_words)
+        try:
+            address = urlsplit(url)
+            host = address.hostname
+        except ValueError:
+            return False
+        return address.scheme in ("http", "https") and host is not None and any(
+            host == domain or host.endswith("." + domain) for domain in cls.domains
+        )
 
 
 class YoutubeVideoService(VideoServiceBase):
     name = "YouTube"
-    key_words = ['youtube', 'youtu.be', 'shorts']
+    domains = ("youtube.com", "youtu.be")
     parser = YouTubeParser
 
 
 class InstagramVideoService(VideoServiceBase):
     name = "Instagram"
-    key_words = ['instagram', 'reels']
+    domains = ("instagram.com",)
     parser = InstagramParser
 
 
 class VkVideoService(VideoServiceBase):
     name = "VK"
-    key_words = ['vkvideo', 'vk.com/video', 'vk.com/club', 'vk.com/clip']
+    domains = ("vk.com", "vkvideo.ru")
     parser = VkParser
-
-
-class RutubeVideoService(VideoServiceBase):
-    name = "RuTube"
-    key_words = [
-        'rutube.ru',
-        'rutube.ru/video',
-        'rutube',
-        'rutube.ru/play',
-        'rutube.ru/embed',
-    ]
-    parser = RutubeParser
-
-
-class TikTokVideoService(VideoServiceBase):
-    name = "TikTok"
-    key_words = [
-        'tiktok.com',
-        'www.tiktok.com',
-        'vt.tiktok.com',
-    ]
-    parser = TikTokParser
 
 
 class VideoServicesManager:

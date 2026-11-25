@@ -1,5 +1,4 @@
 import re
-import time
 import asyncio
 import aiohttp
 import json as _json
@@ -13,6 +12,7 @@ from typing import Callable, TypeVar
 from urllib.error import URLError
 from urllib.parse import quote_plus
 
+from yarl import URL
 from fastapi import HTTPException
 from pytubefix import Stream, YouTube, StreamQuery
 from pytubefix.exceptions import MaxRetriesExceeded, VideoUnavailable
@@ -26,6 +26,7 @@ from app.models.status import VideoDownloadStatus
 from app.models.types import DownloadTask
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoFormat, SVideoResponse, SVideoDownload, SYoutubeSearchItem
+from app.utils.media_transfer import TransferProgress, download_http_file
 from app.utils.validators_utils import fallback_background_task
 from app.utils.video_utils import save_preview_on_s3, combine_audio_and_video, convert_to_mp3
 
@@ -154,110 +155,91 @@ class YouTubeParser(BaseParser):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"YouTube search failed: {e}")
 
+    def _resolve_tracks(self, itags):
+        streams = self._yt.streams
+        tracks = {}
+        for itag in itags:
+            stream = streams.get_by_itag(itag)
+            if stream is None:
+                raise ValueError(f"YouTube format {itag} is no longer available.")
+            tracks[itag] = stream, stream.filesize
+        return tracks
+
+    async def _download_track(self, session, staging, track, resolved, progress):
+        task = progress.task
+        task.video_status.description = f"Downloading {track} track"
+        await redis_cache.set_download_task(task)
+        prefix = f"{task.id_}_{track}_"
+        stream, size = resolved
+        itag = stream.itag
+        initial_bytes = progress.received
+        if not stream.is_sabr and size:
+            path = Path(stream.get_file_path(output_path=staging, filename_prefix=prefix))
+            try:
+                await download_http_file(session, URL(stream.url, encoded=True), path, progress, size)
+                return path
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+                LOG.info("Using native YouTube transfer for format %s", itag)
+
+        if await redis_cache.is_task_canceled(task.id_):
+            raise DownloadUserCanceledException()
+        loop = asyncio.get_running_loop()
+
+        def on_chunk(_, chunk, remaining):
+            update = progress.advance(len(chunk), force=remaining == 0)
+            asyncio.run_coroutine_threadsafe(update, loop).result()
+
+        def native_download():
+            # A connection retry creates a fresh YouTube instance and signed URL.
+            current, expected = self._resolve_tracks([itag])[itag]
+            progress.received = initial_bytes
+            self._yt.register_on_progress_callback(on_chunk)
+            name = current.download(output_path=staging, filename_prefix=prefix,
+                                    skip_existing=False, timeout=30, max_retries=2)
+            if not name or not Path(name).stat().st_size:
+                raise RuntimeError(f"YouTube returned an empty {track} file.")
+            if expected and not current.is_sabr and Path(name).stat().st_size != expected:
+                raise RuntimeError(f"Incomplete YouTube {track} file.")
+            return Path(name)
+
+        return await self._with_connection_retry(native_download, "downloading track")
+
     @fallback_background_task
     async def download(self, task_id: str, download_video: SVideoDownload):
         task: DownloadTask = await redis_cache.get_download_task(task_id)
-
         download_path = Path(settings.DOWNLOAD_FOLDER) / task.video_status.video.author
+        download_path.mkdir(parents=True, exist_ok=True)
         task.filepath = download_path
-        event_loop = asyncio.get_running_loop()
+        await redis_cache.set_download_task(task)
 
-        last_t = time.time()
-        last_bytes = 0
+        itags = {download_video.audio_format_id, download_video.video_format_id} - {""}
+        tracks = await self._with_connection_retry(lambda: self._resolve_tracks(itags), "resolving tracks")
+        progress = TransferProgress(task, sum(size for _, size in tracks.values()))
 
-        def post_process_hook(stream_: Stream, chunk: bytes, bytes_remaining: int):
-            nonlocal last_t, last_bytes
-            bytes_received = stream_.filesize - bytes_remaining
-            percent = round(100.0 * bytes_received / float(stream_.filesize), 1)
-            now = time.time()
-            dt = max(1e-3, now - last_t)
-            speed = float(max(0.0, (bytes_received - last_bytes)) / dt)
-            remain = max(0, stream_.filesize - bytes_received)
-            eta = int(remain / max(1.0, speed)) if speed > 0 else None
-            last_t = now
-            last_bytes = bytes_received
-
-            task.video_status.percent = float(percent)
-            task.video_status.speed_bps = speed
-            task.video_status.eta_seconds = eta
-
-            async def _update_and_check():
-                await redis_cache.set_download_task(task)
-                if await redis_cache.is_task_canceled(task_id):
-                    raise DownloadUserCanceledException()
-
-            asyncio.run_coroutine_threadsafe(_update_and_check(), event_loop).result()
-
-        def download_track(itag: str, track: str) -> Path:
-            nonlocal last_t, last_bytes
-            last_t = time.time()
-            last_bytes = 0
-            self._yt.register_on_progress_callback(post_process_hook)
-            stream = self._yt.streams.get_by_itag(itag)
-            if stream is None:
-                raise ValueError(f"YouTube format {itag} is no longer available.")
-
-            download_path.mkdir(parents=True, exist_ok=True)
-            with TemporaryDirectory(dir=download_path) as staging:
-                filename = stream.download(
-                    output_path=staging,
-                    filename_prefix=f"{task_id}_{track}_",
-                    timeout=30,
-                    max_retries=2,
-                )
-                if not filename:
-                    raise RuntimeError(f"YouTube returned no {track} file.")
-                source = Path(filename)
-                if source.stat().st_size == 0:
-                    raise RuntimeError(f"YouTube returned an empty {track} file.")
-                return source.replace(download_path / source.name)
-
-        if not download_video.video_format_id:
-            task.video_status.description = "Downloading audio track"
-            await redis_cache.set_download_task(task)
-            audio_path = await self._with_connection_retry(
-                lambda: download_track(download_video.audio_format_id, "audio"), "downloading audio"
-            )
-
-            task.video_status.description = "Converting to MP3"
-            await redis_cache.set_download_task(task)
-            out_path = audio_path.with_suffix('.mp3')
-            await asyncio.to_thread(convert_to_mp3,
-                                    audio_path.as_posix(),
-                                    out_path.as_posix()
-                                    )
-            audio_path.unlink(missing_ok=True)
-            task.filepath = out_path
-
-        else:
-            # Стандартная логика для видео
-            task.video_status.description = "Downloading video track"
-            await redis_cache.set_download_task(task)
-            video_path = await self._with_connection_retry(
-                lambda: download_track(download_video.video_format_id, "video"), "downloading video"
-            )
-            if download_video.audio_format_id != download_video.video_format_id:
-                task.video_status.description = "Downloading audio track"
-                await redis_cache.set_download_task(task)
-                try:
-                    audio_path = await self._with_connection_retry(
-                        lambda: download_track(download_video.audio_format_id, "audio"), "downloading audio"
-                    )
-                except YouTubeConnectionError:
-                    video_path.unlink(missing_ok=True)
-                    raise
-                task.video_status.description = "Merging tracks"
-                await redis_cache.set_download_task(task)
-                out_path = video_path.with_name(video_path.stem + "_out.mp4")
-                await asyncio.to_thread(combine_audio_and_video,
-                                        video_path.as_posix(),
-                                        audio_path.as_posix(),
-                                        out_path.as_posix()
-                                        )
-                audio_path.unlink(missing_ok=True)
-                video_path.unlink(missing_ok=True)
-                video_path = out_path
-            task.filepath = video_path
+        timeout = aiohttp.ClientTimeout(total=None, sock_connect=15, sock_read=30)
+        with TemporaryDirectory(dir=download_path) as staging:
+            async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
+                if not download_video.video_format_id:
+                    audio = await self._download_track(session, staging, "audio",
+                                                       tracks[download_video.audio_format_id], progress)
+                    task.video_status.description = "Converting to MP3"
+                    await redis_cache.set_download_task(task)
+                    result = audio.with_suffix(".mp3")
+                    await asyncio.to_thread(convert_to_mp3, str(audio), str(result))
+                else:
+                    video = await self._download_track(session, staging, "video",
+                                                       tracks[download_video.video_format_id], progress)
+                    result = video
+                    if download_video.audio_format_id != download_video.video_format_id:
+                        audio = await self._download_track(session, staging, "audio",
+                                                           tracks[download_video.audio_format_id], progress)
+                        task.video_status.description = "Merging tracks"
+                        await redis_cache.set_download_task(task)
+                        result = video.with_name(video.stem + "_out.mp4")
+                        await asyncio.to_thread(combine_audio_and_video, str(video), str(audio), str(result))
+            if await redis_cache.is_task_canceled(task_id):
+                raise DownloadUserCanceledException()
+            task.filepath = result.replace(download_path / result.name)
 
         post_process = PostPrecess(task, download_video)
         await post_process.process()
@@ -276,11 +258,11 @@ class YouTubeParser(BaseParser):
 
     @staticmethod
     def _get_audio_stream(streams: StreamQuery) -> Stream | None:
-        main_stream = next(
-            (s for s in streams if s.includes_audio_track and s.includes_video_track),
-            None
-        ) or streams.filter(only_audio=True).order_by('abr').first()
-        return main_stream
+        progressive = streams.filter(progressive=True).first()
+        aac = streams.filter(only_audio=True, mime_type="audio/mp4").order_by("abr")
+        if progressive:
+            return aac.last() or progressive
+        return aac.first() or streams.filter(only_audio=True).order_by("abr").first()
 
     async def get_formats(self) -> SVideoResponse:
         try:
@@ -307,8 +289,8 @@ class YouTubeParser(BaseParser):
                 **{
                     "quality": v_format.resolution,
                     "video_format_id": str(v_format.itag),
-                    "audio_format_id": str(audio.itag),
-                    "filesize": round(v_format.filesize + audio.filesize, 2),
+                    "audio_format_id": str(v_format.itag if v_format.includes_audio_track else audio.itag),
+                    "filesize": v_format.filesize + (0 if v_format.includes_audio_track else audio.filesize),
                 }
             ) for v_format in filter(self._format_filter, streams)
         ]

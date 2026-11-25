@@ -2,20 +2,20 @@ import asyncio
 import json
 import re
 import ssl
-import aiofiles
+from tempfile import TemporaryDirectory
 from pathlib import Path
 
 import aiohttp
 from dataclasses import dataclass
 
 from app.config import settings
-from app.exceptions import DownloadUserCanceledException
 from app.models.cache import redis_cache
 from app.models.post_process import PostPrecess
 from app.models.status import VideoDownloadStatus
 from app.models.types import DownloadTask
 from app.parsers.base import BaseParser
 from app.schemas.main import SVideoResponse, SVideoDownload, SVideoFormat
+from app.utils.media_transfer import TransferProgress, download_http_file
 from app.utils.helpers import remove_all_spec_chars
 from app.utils.validators_utils import fallback_background_task
 from app.utils.video_utils import convert_to_mp3
@@ -61,8 +61,6 @@ class VkVideo:
 
 
 class VkParser(BaseParser):
-    CONNECTIONS_COUNT = 10
-    CHUNK_SIZE = 1024 * 64
     VIDEO_INFO_URL = "https://vkvideo.ru/al_video.php?act=show"
 
     def __init__(self, url):
@@ -70,76 +68,16 @@ class VkParser(BaseParser):
         self.url = url
         self.owner_id, self.video_id = re.search(r"(video|clip)-?(\d+_\d+)", self.url).group(2).split("_")
         self.access_token = None
-        self.bytes_read = 0
-        self.total_size = 0
 
         self._headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 YaBrowser/25.6.0.0 Safari/537.36",
             "X-Requested-With": "XMLHttpRequest",
             "Referer": f"https://vkvideo.ru/video-{self.owner_id}_{self.video_id}",
         }
-        self._lock = asyncio.Lock()
 
         self._ssl_context = ssl.create_default_context()
         self._ssl_context.check_hostname = False
         self._ssl_context.verify_mode = ssl.CERT_NONE
-
-    async def _fetch_range(self,
-                           session: aiohttp.ClientSession,
-                           url: str,
-                           start: int,
-                           end: int,
-                           part_number: int,
-                           task_id: str,
-                           task: DownloadTask,
-                           download_path: Path,
-                           ):
-        headers = {
-            **self._headers,
-            "Range": f"bytes={start}-{end}",
-        }
-        async with session.get(url, headers=headers, ssl=self._ssl_context) as resp:
-            resp.raise_for_status()
-
-            part_file = download_path.parent / task_id / f"part_{part_number}.tmp"
-            part_file.parent.mkdir(parents=True, exist_ok=True)
-            async with aiofiles.open(part_file, "wb") as f:
-                async for chunk in resp.content.iter_chunked(self.CHUNK_SIZE):
-                    async with self._lock:
-                        self.bytes_read += len(chunk)
-                        task.video_status.percent = int((self.bytes_read / self.total_size) * 100)
-                        # Оценка скорости и ETA по глобальному прогрессу
-                        # Для простоты: считаем среднюю скорость на весь файл через отношение прочитанных байт ко времени
-                        # Более точно можно считать по moving average, но достаточно и этого
-                        # Время берём из loop.time() сохранённого в начале
-                        try:
-                            if not hasattr(self, "_start_time"):
-                                import time
-                                self._start_time = time.time()
-                            import time
-                            elapsed = max(1e-3, time.time() - self._start_time)
-                            speed = float(self.bytes_read) / elapsed
-                            remain = max(0, self.total_size - self.bytes_read)
-                            task.video_status.speed_bps = speed
-                            task.video_status.eta_seconds = int(remain / speed) if speed > 0 else None
-                        except Exception:
-                            pass
-                        await redis_cache.set_download_task(task)
-                    await f.write(chunk)
-                    if await redis_cache.is_task_canceled(task_id):
-                        raise DownloadUserCanceledException()
-        return part_file
-
-    @staticmethod
-    async def _merge_parts(part_files: list[Path], output_file: Path):
-        async with aiofiles.open(output_file, "wb") as out:
-            for part in part_files:
-                async with aiofiles.open(part, "rb") as pf:
-                    content = await pf.read()
-                    await out.write(content)
-                part.unlink()
-            else:
-                part.parent.rmdir()
 
     async def _get_video_info(self, session: aiohttp.ClientSession) -> dict:
         try:
@@ -185,56 +123,24 @@ class VkParser(BaseParser):
             download_path.parent.mkdir(parents=True, exist_ok=True)
 
             task.video_status.description = "Downloading audio track" if is_audio_only else "Downloading video track"
-            await redis_cache.set_download_task(task)
-
             if is_audio_only:
                 content_url = video.content_urls[download_video.audio_format_id]
             else:
                 content_url = video.content_urls[download_video.video_format_id]
 
-            async with session.get(content_url, ssl=self._ssl_context) as response:
-                response.raise_for_status()
-                self.total_size = int(response.headers.get('Content-Length', 0))
-
-            ranges = []
-            for i in range(self.CONNECTIONS_COUNT):
-                start = i * (self.total_size // self.CONNECTIONS_COUNT)
-                end = (
-                        start + (self.total_size // self.CONNECTIONS_COUNT) - 1
-                ) if i < self.CONNECTIONS_COUNT - 1 else self.total_size - 1
-                ranges.append((start, end, i))
-
-            task.filepath = download_path.parent / task_id
+            task.filepath = download_path
             await redis_cache.set_download_task(task)
-            tasks = [
-                asyncio.create_task(
-                    self._fetch_range(session, content_url, start, end, part_num, task_id, task, temp_path)
-                )
-                for start, end, part_num in ranges
-            ]
-            try:
-                part_files = await asyncio.gather(*tasks)
-            except DownloadUserCanceledException:
-                for t in tasks:
-                    t.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
-                raise
-
-            task.video_status.description = "Merging parts"
-            await redis_cache.set_download_task(task)
-            await self._merge_parts(part_files, temp_path)
-
-            if is_audio_only:
-                task.video_status.description = "Converting to MP3"
-                await redis_cache.set_download_task(task)
-                await asyncio.to_thread(convert_to_mp3,
-                                    temp_path.as_posix(),
-                                    download_path.as_posix()
-                                    )
-                temp_path.unlink(missing_ok=True)
-                task.filepath = download_path
-            else:
-                task.filepath = temp_path
+            with TemporaryDirectory(dir=download_path.parent) as staging:
+                media = Path(staging) / temp_path.name
+                await download_http_file(session, content_url, media, TransferProgress(task))
+                if is_audio_only:
+                    task.video_status.description = "Converting to MP3"
+                    await redis_cache.set_download_task(task)
+                    result = Path(staging) / download_path.name
+                    await asyncio.to_thread(convert_to_mp3, str(media), str(result))
+                else:
+                    result = media
+                result.replace(download_path)
 
         post_process = PostPrecess(task, download_video)
         await post_process.process()

@@ -44,6 +44,7 @@ const navMenu = document.getElementById('navMenu');
 // Download ready elements  
 const downloadReadyContainer = document.getElementById('downloadReadyContainer');
 const downloadReadyBtn = document.getElementById('downloadReadyBtn');
+const backToFormats = document.getElementById('backToFormats');
 
 // Clear input elements
 const clearInputBtn = document.getElementById('clearInput');
@@ -103,12 +104,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    document.getElementById('backToFormats').addEventListener('click', returnToFormats);
-    downloadReadyBtn.addEventListener('click', () => {
-        if (currentTaskId && saveStatusCheck !== currentTaskId) {
-            saveStatusCheck = currentTaskId;
-            checkFileDelivery(currentTaskId);
+    backToFormats.addEventListener('click', returnToFormats);
+    downloadReadyBtn.addEventListener('click', event => {
+        if (!currentTaskId || saveStatusCheck) {
+            event.preventDefault();
+            return;
         }
+        saveStatusCheck = currentTaskId;
+        downloadReadyBtn.setAttribute('aria-disabled', 'true');
+        downloadReadyBtn.setAttribute('tabindex', '-1');
+        downloadReadyBtn.textContent = 'Передаём файл…';
+        backToFormats.disabled = true;
+        statusText.textContent = 'Передаём файл в браузер';
+        checkFileDelivery(currentTaskId);
     });
 
     // Кнопка отмены
@@ -506,6 +514,10 @@ function applyTaskStatus(task) {
         inspectorTitle.textContent = 'Файл готов';
         cancelBtn.hidden = true;
         downloadReadyBtn.href = '/api/get-video/' + task.task_id;
+        downloadReadyBtn.removeAttribute('aria-disabled');
+        downloadReadyBtn.removeAttribute('tabindex');
+        downloadReadyBtn.textContent = 'Сохранить файл';
+        backToFormats.disabled = false;
         downloadReadyContainer.hidden = false;
         if (progressSection.contains(document.activeElement) || document.activeElement === document.body) {
             downloadReadyBtn.focus();
@@ -602,9 +614,21 @@ async function cancelCurrentTask() {
 function returnToFormats() {
     currentTaskId = null;
     saveStatusCheck = null;
+    progressSection.classList.remove('is-returning');
     const shouldMoveFocus = progressSection.contains(document.activeElement);
     showResults();
     if (shouldMoveFocus) formatsList.querySelector('select')?.focus();
+}
+
+function finishFileDelivery(taskId) {
+    if (saveStatusCheck !== taskId || currentTaskId !== taskId) return;
+    statusText.textContent = 'Файл получен';
+    inspectorTitle.textContent = 'Возвращаем параметры';
+    progressSection.classList.add('is-returning');
+    const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 420;
+    setTimeout(() => {
+        if (saveStatusCheck === taskId && currentTaskId === taskId) returnToFormats();
+    }, delay);
 }
 
 async function checkFileDelivery(taskId) {
@@ -612,11 +636,18 @@ async function checkFileDelivery(taskId) {
     try {
         const response = await fetch('/api/download-status/' + taskId, {cache: 'no-store'});
         if (response.ok && (await response.json()).status === 'done' && isCurrent()) {
-            returnToFormats();
+            finishFileDelivery(taskId);
             return;
         }
         if (response.status === 404) {
-            if (saveStatusCheck === taskId) saveStatusCheck = null;
+            if (saveStatusCheck === taskId) {
+                saveStatusCheck = null;
+                downloadReadyBtn.removeAttribute('aria-disabled');
+                downloadReadyBtn.removeAttribute('tabindex');
+                downloadReadyBtn.textContent = 'Сохранить файл';
+                backToFormats.disabled = false;
+                showError('Не удалось подтвердить передачу файла. Попробуйте ещё раз.');
+            }
             return;
         }
     } catch (error) {
@@ -625,12 +656,13 @@ async function checkFileDelivery(taskId) {
     if (isCurrent()) {
         setTimeout(() => {
             if (isCurrent()) checkFileDelivery(taskId);
-        }, 1500);
+        }, 500);
     }
 }
 
 function showResults() {
     saveStatusCheck = null;
+    progressSection.classList.remove('is-returning');
     videoWorkspace.hidden = false;
     inspectorTitle.textContent = 'Параметры файла';
     progressSection.hidden = true;

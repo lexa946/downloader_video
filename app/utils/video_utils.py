@@ -72,7 +72,7 @@ def combine_audio_and_video(video_path, audio_path, output_path):
         "-shortest",  # обрезаем по короткому
         "-y",  # перезапись без подтверждения
         output_path
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
 
 def convert_to_mp3(input_path: str, output_path: str):
@@ -91,7 +91,7 @@ def convert_to_mp3(input_path: str, output_path: str):
         "-q:a", "2",  # качество VBR (0-9, где 0 лучшее)
         "-y",  # перезапись без подтверждения
         output_path
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
 
 def cut_media(input_path: str,

@@ -9,7 +9,7 @@ function draw(){
   for(let j=0;j<=70;j++){
    const v=tau*j/70,r=1+.43*Math.cos(v),x=r*Math.cos(t),y=r*Math.sin(t),z=.43*Math.sin(v)+.22*Math.sin(2*t);
    const a=x*.86+z*.51,b=y*.68-(-x*.51+z*.86)*.735;
-   const sx=(a*.89+b*.455)*k+w*.5,sy=(-a*.455+b*.89)*k+h*(w<=760?.72:.5);
+   const sx=(a*.89+b*.455)*k+w*.5,sy=(-a*.455+b*.89)*k+h*.5;
    if(j===0)path.moveTo(sx,sy);else path.lineTo(sx,sy);
    depth+=(y*.735+(-x*.51+z*.86)*.68)/71;
   }

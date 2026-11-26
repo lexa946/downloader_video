@@ -10,6 +10,8 @@ const videoUrlInput = document.getElementById('videoUrl');
 const analyzeBtn = document.getElementById('analyzeBtn');
 const resultsSection = document.getElementById('results');
 const progressSection = document.getElementById('progress');
+const downloadAd = document.querySelector('.download-ad');
+let downloadAdRequested = false;
 const formatsList = document.getElementById('formatsList');
 const videoTitle = document.getElementById('videoTitle');
 const videoAuthor = document.getElementById('videoAuthor');
@@ -680,6 +682,35 @@ function showProgress() {
     inspectorTitle.textContent = 'Загрузка файла';
     resultsSection.hidden = true;
     progressSection.hidden = false;
+    requestDownloadAd();
+}
+
+function requestDownloadAd() {
+    if (!downloadAd || downloadAdRequested || !document.getElementById('consentBackdrop')?.hidden) return;
+
+    downloadAdRequested = true;
+    const banner = downloadAd.querySelector('.download-ad-banner');
+    const label = downloadAd.querySelector('.download-ad-label');
+    const hideAd = () => { downloadAd.hidden = true; };
+
+    window.yaContextCb = window.yaContextCb || [];
+    window.yaContextCb.push(() => {
+        downloadAd.hidden = false;
+        window.Ya.Context.AdvManager.render({
+            blockId: 'R-A-16518515-5',
+            renderTo: banner.id,
+            onRender: () => { label.hidden = false; },
+            onError: ({type}) => {
+                if (type === 'error') hideAd();
+            },
+        });
+    });
+
+    const script = document.createElement('script');
+    script.src = 'https://yandex.ru/ads/system/context.js';
+    script.async = true;
+    script.addEventListener('error', hideAd, {once: true});
+    document.head.append(script);
 }
 
 // Cleanup on page unload

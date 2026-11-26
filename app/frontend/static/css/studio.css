@@ -31,6 +31,21 @@
 }
 
 [hidden] { display: none !important; }
+
+.download-ad {
+  min-width: 0;
+}
+
+.download-ad-label {
+  display: block;
+  color: var(--muted);
+  font-size: .8rem;
+  margin-bottom: 4px;
+}
+
+.download-ad-banner {
+  min-height: 90px;
+}
 body {
     min-height: 100vh;
     min-height: 100dvh;

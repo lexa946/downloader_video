@@ -78,8 +78,8 @@ async def google_verification():
     return FileResponse(google_file, media_type="text/html")
 
 
-@router.get("/yandex_c51849ff7e8fe28a.html", response_class=FileResponse)
+@router.get("/yandex_35edcd15eb64a60c.html", response_class=FileResponse)
 async def yandex_verification():
     """Yandex верификация"""
-    yandex_file = FRONTEND_DIR / "seo" / "yandex_c51849ff7e8fe28a.html"
+    yandex_file = FRONTEND_DIR / "seo" / "yandex_35edcd15eb64a60c.html"
     return FileResponse(yandex_file, media_type="text/html")

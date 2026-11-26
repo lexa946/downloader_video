@@ -42,7 +42,7 @@
     </noscript>
     <!-- /Yandex.Metrika counter -->
     <!-- Yandex.RTB -->
-    <script>window.yaContextCb = window.yaContextCb || []</script>
+    <script>window.yaContextCb=window.yaContextCb||[]</script>
     <script src="https://yandex.ru/ads/system/context.js" async></script>
 
     <!-- Google Tag Manager -->
@@ -76,45 +76,15 @@
 
     {% endblock %}
     {% include 'main/footer.html' %}
-    <!-- Yandex.RTB R-A-16518515-4 -->
+    <!-- Yandex.RTB R-A-20510772-1 -->
+    <div id="yandex_rtb_R-A-20510772-1"></div>
     <script>
-        window.yaContextCb.push(() => {
-            Ya.Context.AdvManager.render({
-                "blockId": "R-A-16518515-4",
-                "type": "floorAd",
-                "platform": "touch"
-            })
+    window.yaContextCb.push(() => {
+        Ya.Context.AdvManager.render({
+            "blockId": "R-A-20510772-1",
+            "renderTo": "yandex_rtb_R-A-20510772-1"
         })
-    </script>
-    <!-- Yandex.RTB R-A-16518515-3 -->
-    <script>
-        window.yaContextCb.push(() => {
-            Ya.Context.AdvManager.render({
-                "blockId": "R-A-16518515-3",
-                "type": "floorAd",
-                "platform": "desktop"
-            })
-        })
-    </script>
-    <!-- Yandex.RTB R-A-16518515-2 -->
-    <script>
-        window.yaContextCb.push(() => {
-            Ya.Context.AdvManager.render({
-                "blockId": "R-A-16518515-2",
-                "type": "fullscreen",
-                "platform": "desktop"
-            })
-        })
-    </script>
-    <!-- Yandex.RTB R-A-16518515-1 -->
-    <script>
-        window.yaContextCb.push(() => {
-            Ya.Context.AdvManager.render({
-                "blockId": "R-A-16518515-1",
-                "type": "fullscreen",
-                "platform": "touch"
-            })
-        })
+    })
     </script>
 </div>
 

@@ -40,3 +40,9 @@ class Settings(BaseSettings):
 
 
 settings = Settings(_env_file=os.environ.get("DOWNLOADER_ENV_FILE", ".env") or None)
+
+# Compose's env_file injects MEDIA_PROXY_URL into the container. Mirror it to
+# urllib/aiohttp's standard proxy variables after settings have been loaded.
+if settings.MEDIA_PROXY_URL:
+    os.environ["HTTPS_PROXY"] = settings.MEDIA_PROXY_URL
+    os.environ["https_proxy"] = settings.MEDIA_PROXY_URL

@@ -44,13 +44,13 @@ docker compose --env-file .env.production -f docker-compose.yaml logs --tail=100
 
 ## Mihomo для YouTube и Instagram
 
-В `.env.production` укажите `MEDIA_PROXY_URL=http://host.docker.internal:ПОРТ`. Используйте HTTP-порт или mixed-port Mihomo. Порт SOCKS без HTTP-интерфейса здесь не подходит. Compose передаёт адрес прокси веб-сервису и воркеру и сопоставляет `host.docker.internal` с адресом Docker-хоста. Если Mihomo работает на хосте, он должен принимать соединения с Docker-сети. Прослушивание только `127.0.0.1` на хосте не позволит контейнеру подключиться к нему. Настройте в Mihomo `allow-lan` и `bind-address` под эту сеть и ограничьте доступ к порту прокси средствами брандмауэра.
+В `.env.production` задайте `MEDIA_PROXY_URL=http://192.168.1.138:7490`. Это HTTP-порт Mihomo на вашем сервере. Порт `7892` тоже подходит, если настроен как mixed-port. Порт SOCKS-only без HTTP-интерфейса здесь не подходит. Compose передаёт адрес прокси веб-сервису и воркеру. Mihomo должен принимать соединения с Docker-сети. Если слушает только на `127.0.0.1`, контейнер к нему не подключится. Настройте в Mihomo `allow-lan` и `bind-address` для адреса сервера и ограничьте доступ к порту прокси средствами брандмауэра.
 
-YouTube и Instagram используют этот прокси при чтении страницы, поиске, получении форматов, превью и скачивании медиа. VK подключается напрямую. При пустом `MEDIA_PROXY_URL` все три площадки подключаются напрямую. После изменения `.env.production` пересоздайте оба контейнера приложения.
+При старте веб-приложение и worker отдельно проверяют TCP-соединение с Mihomo и пишут в Docker-логи `Mihomo HTTP proxy is reachable` или `Mihomo HTTP proxy is unreachable`. Проверка подтверждает доступность порта из контейнера. YouTube и Instagram используют прокси при чтении страницы, поиске, получении форматов, превью и скачивании медиа. VK подключается напрямую. При пустом `MEDIA_PROXY_URL` площадки используют прямое соединение. После изменения `.env.production` пересоздайте оба контейнера приложения.
 
 ```sh
 docker compose --env-file .env.production -f docker-compose.yaml up -d --build --force-recreate --wait
-docker compose --env-file .env.production -f docker-compose.yaml exec -T downloader_video python -c "import os,socket,urllib.parse; u=urllib.parse.urlsplit(os.environ['HTTPS_PROXY']); s=socket.create_connection((u.hostname,u.port),5); print('Mihomo reachable'); s.close()"
+docker compose --env-file .env.production -f docker-compose.yaml logs --tail=30 downloader_video worker
 ```
 
 Вторая команда проверяет TCP-доступность порта Mihomo из контейнера. Затем проверьте получение форматов и скачивание по одной ссылке с YouTube, Instagram и VK. Если порт Mihomo недоступен, проверьте его адрес прослушивания и правила брандмауэра хоста. Не используйте `127.0.0.1` в `MEDIA_PROXY_URL`, когда Mihomo запущен вне контейнера.

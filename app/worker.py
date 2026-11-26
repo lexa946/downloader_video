@@ -3,6 +3,9 @@ from arq import cron
 
 import os
 import time
+import asyncio
+from logging import getLogger
+from urllib.parse import urlsplit
 from pathlib import Path
 
 from app.models.status import VideoDownloadStatus
@@ -107,3 +110,24 @@ class WorkerSettings:
     cron_jobs = [
         cron(cleanup_old_videos, hour=3, minute=0),
     ]
+
+    @staticmethod
+    async def on_startup(ctx):
+        proxy_url = settings.MEDIA_PROXY_URL
+        if not proxy_url:
+            getLogger(__name__).warning(
+                "Mihomo proxy is not configured. YouTube and Instagram use direct connections."
+            )
+            return
+        parsed = urlsplit(proxy_url)
+        try:
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection(parsed.hostname, parsed.port or 80), timeout=5
+            )
+            writer.close()
+            await writer.wait_closed()
+            getLogger(__name__).info("Mihomo HTTP proxy is reachable at %s:%s",
+                                     parsed.hostname, parsed.port or 80)
+        except (OSError, asyncio.TimeoutError, ValueError) as exc:
+            getLogger(__name__).error("Mihomo HTTP proxy is unreachable at %s:%s: %s",
+                                      parsed.hostname, parsed.port or 80, exc)

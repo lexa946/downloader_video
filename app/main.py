@@ -1,4 +1,7 @@
 from pathlib import Path
+import asyncio
+from logging import getLogger
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from starlette.responses import JSONResponse
@@ -16,6 +19,25 @@ from app.models.queue import task_queue
 app = FastAPI(docs_url=None if settings.APP_ENV == "production" else "/docs",
               redoc_url=None if settings.APP_ENV == "production" else "/redoc",
               openapi_url=None if settings.APP_ENV == "production" else "/openapi.json")
+LOG = getLogger(__name__)
+
+
+async def check_media_proxy():
+    proxy_url = settings.MEDIA_PROXY_URL
+    if not proxy_url:
+        LOG.warning("Mihomo proxy is not configured. YouTube and Instagram use direct connections.")
+        return
+    parsed = urlsplit(proxy_url)
+    try:
+        _, writer = await asyncio.wait_for(
+            asyncio.open_connection(parsed.hostname, parsed.port or 80), timeout=5
+        )
+        writer.close()
+        await writer.wait_closed()
+        LOG.info("Mihomo HTTP proxy is reachable at %s:%s", parsed.hostname, parsed.port or 80)
+    except (OSError, asyncio.TimeoutError, ValueError) as exc:
+        LOG.error("Mihomo HTTP proxy is unreachable at %s:%s: %s",
+                  parsed.hostname, parsed.port or 80, exc)
 
 @app.middleware("http")
 async def require_cookie_consent(request: Request, call_next):
@@ -40,6 +62,7 @@ async def favicon():
 
 @app.on_event("startup")
 async def on_startup():
+    await check_media_proxy()
     try:
         tasks = await redis_cache.get_all_tasks()
         for task_id, task in tasks.items():

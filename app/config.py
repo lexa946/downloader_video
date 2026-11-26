@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     CLEANUP_RETENTION_HOURS: int = 24
     COOKIE_SECURE: bool = False
     APP_ENV: str = "development"
+    MEDIA_PROXY_URL: str = ""
 
     S3_ACCESS_KEY: str
     S3_SECRET_KEY: str

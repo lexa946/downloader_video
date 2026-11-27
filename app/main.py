@@ -4,9 +4,9 @@ from logging import getLogger
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
-from starlette.responses import JSONResponse
+from starlette.responses import FileResponse, JSONResponse, RedirectResponse
+from starlette.routing import Match
 from app.config import settings
-from starlette.responses import FileResponse
 from starlette.staticfiles import StaticFiles
 
 from app.routers.service import router as service_router
@@ -42,7 +42,10 @@ async def check_media_proxy():
 @app.middleware("http")
 async def require_cookie_consent(request: Request, call_next):
     if request.url.path.startswith("/api/") and not request.url.path.startswith("/api/cookie-consent"):
-        if not await has_consent(request):
+        matches_service_route = any(
+            route.matches(request.scope)[0] != Match.NONE for route in service_router.routes
+        )
+        if matches_service_route and not await has_consent(request):
             return JSONResponse({"detail": "Требуется согласие на использование cookie."}, status_code=403)
     return await call_next(request)
 
@@ -50,6 +53,18 @@ app.include_router(consent_router)
 app.include_router(service_router)
 app.include_router(new_front_router)
 app.mount("/static", StaticFiles(directory="app/frontend/static"), name="static")
+
+
+async def redirect_to_home(scope, receive, send):
+    if scope["type"] != "http":
+        await app.router.not_found(scope, receive, send)
+        return
+    response = RedirectResponse(url="/", status_code=303)
+    await response(scope, receive, send)
+
+
+app.router.default = redirect_to_home
+
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():

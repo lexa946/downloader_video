@@ -41,6 +41,7 @@ class SVideoStatus(BaseModel):
     eta_seconds: Optional[int] = field(default=None)
     speed_bps: Optional[float] = field(default=None)
     created_at: Optional[float] = field(default=None)
+    file_available: Optional[bool] = None
 
 
 class SYoutubeSearchItem(BaseModel):

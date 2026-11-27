@@ -1,9 +1,12 @@
 // App state
 let currentVideoData = null;
-let currentTaskId = null;
+let currentDownload = null;
+let startRequest = null;
 let progressInterval = null;
 let eventSource = null;
 let saveStatusCheck = null;
+const downloadStorageKey = 'signal.currentDownload';
+const videoStorageKey = 'signal.videoParameters';
 
 // DOM elements
 const videoUrlInput = document.getElementById('videoUrl');
@@ -55,7 +58,6 @@ const clearInputBtn = document.getElementById('clearInput');
 document.addEventListener('DOMContentLoaded', function() {
 
     setActiveNavigation();
-    if (document.getElementById('consentBackdrop')?.hidden) restoreActiveDownload();
 
     analyzeTab.addEventListener('submit', event => {
         event.preventDefault();
@@ -108,17 +110,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     backToFormats.addEventListener('click', returnToFormats);
     downloadReadyBtn.addEventListener('click', event => {
-        if (!currentTaskId || saveStatusCheck) {
+        if (!currentDownload || saveStatusCheck) {
             event.preventDefault();
             return;
         }
-        saveStatusCheck = currentTaskId;
+        saveStatusCheck = currentDownload;
         downloadReadyBtn.setAttribute('aria-disabled', 'true');
         downloadReadyBtn.setAttribute('tabindex', '-1');
         downloadReadyBtn.textContent = 'Передаём файл…';
         backToFormats.disabled = true;
         statusText.textContent = 'Передаём файл в браузер';
-        checkFileDelivery(currentTaskId);
+        checkFileDelivery(currentDownload);
     });
 
     // Кнопка отмены
@@ -133,6 +135,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 videoUrlInput.value = '';
                 videoUrlInput.focus();
                 localStorage.removeItem('lastVideoUrl');
+                localStorage.removeItem(videoStorageKey);
+                if (!currentDownload) {
+                    currentVideoData = null;
+                    hideResults();
+                }
             }
         });
     }
@@ -158,8 +165,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Первоначальная проверка
         toggleClearButton();
     }
+    if (document.getElementById('consentBackdrop')?.hidden) restorePage();
 });
-document.addEventListener('cookie-consent-accepted', restoreActiveDownload);
+document.addEventListener('cookie-consent-accepted', restorePage);
 
 // Utility functions
 function showFeedback(message, error = false) {
@@ -260,7 +268,7 @@ function setButtonLoading(button, isLoading) {
 // Main functions
 async function handleAnalyzeVideo() {
     if (!videoUrlInput || analyzeBtn.disabled) return;
-    if (!progressSection.hidden && downloadReadyContainer.hidden) {
+    if (currentDownload && !videoWorkspace.hidden && !progressSection.hidden && downloadReadyContainer.hidden) {
         showSuccess('Дождитесь завершения или отмените текущую загрузку.');
         cancelBtn.focus();
         return;
@@ -275,6 +283,7 @@ async function handleAnalyzeVideo() {
         return;
     }
     
+    resetDownload();
     // Сохраняем ссылку в localStorage
     localStorage.setItem('lastVideoUrl', url);
     
@@ -298,10 +307,10 @@ async function handleAnalyzeVideo() {
         }
         
         const videoData = await response.json();
-        currentVideoData = videoData;
-        
-        displayVideoInfo(videoData);
-        displayFormats(videoData.formats.filter(format => format.video_format_id));
+        if (videoUrlInput.value.trim() !== url) return;
+        const saved = readVideoParameters(url);
+        saveVideoParameters({url, video: videoData, selected: saved?.selected});
+        renderVideoParameters(videoData, saved?.selected);
         showResults();
         
         showSuccess('');
@@ -384,7 +393,45 @@ function displayVideoInfo(videoData) {
     }
 }
 
-function displayFormats(formats) {
+function restorePage() {
+    restoreSavedDownload();
+    if (!currentDownload && !currentVideoData && !analyzeBtn.disabled) {
+        restoreVideoParameters();
+    }
+}
+
+function readVideoParameters(url) {
+    try {
+        const saved = JSON.parse(localStorage.getItem(videoStorageKey));
+        if (saved?.url === url && Array.isArray(saved.video?.formats)) return saved;
+    } catch {
+        // Повреждённая запись или недоступное хранилище.
+    }
+    return null;
+}
+
+function saveVideoParameters(parameters) {
+    try {
+        localStorage.setItem(videoStorageKey, JSON.stringify(parameters));
+    } catch {
+        // Параметры остаются доступны на текущей странице.
+    }
+}
+
+function restoreVideoParameters() {
+    const saved = readVideoParameters(videoUrlInput.value.trim());
+    if (!saved) return;
+    renderVideoParameters(saved.video, saved.selected);
+    showResults();
+}
+
+function renderVideoParameters(video, selected) {
+    currentVideoData = video;
+    displayVideoInfo(video);
+    displayFormats(video.formats.filter(format => format.video_format_id), selected);
+}
+
+function displayFormats(formats, selected) {
     if (!formatsList) return;
     
     formatsList.innerHTML = '';
@@ -401,6 +448,18 @@ function displayFormats(formats) {
         const quality = format.quality === 'unknown' ? 'Исходное качество' : format.quality;
         const size = format.filesize ? ' · ' + formatFileSize(format.filesize) : '';
         select.add(new Option(quality + size, index));
+    });
+    const selectedIndex = formats.findIndex(format =>
+        format.video_format_id === selected?.video && format.audio_format_id === selected?.audio
+    );
+    if (selectedIndex >= 0) select.value = String(selectedIndex);
+    select.addEventListener('change', () => {
+        const saved = readVideoParameters(videoUrlInput.value.trim());
+        const format = formats[Number(select.value)];
+        if (saved && saved.video.url === currentVideoData?.url && format) {
+            saved.selected = {video: format.video_format_id, audio: format.audio_format_id};
+            saveVideoParameters(saved);
+        }
     });
     label.append(select);
     const download = document.createElement('button');
@@ -419,6 +478,7 @@ function displayFormats(formats) {
 }
 
 async function startDownload(videoFormatId, audioFormatId) {
+    if (startRequest) return;
     if (!currentVideoData) {
         showError('Данные о видео не найдены. Попробуйте заново получить форматы.');
         return;
@@ -428,6 +488,9 @@ async function startDownload(videoFormatId, audioFormatId) {
         video_format_id: videoFormatId,
         audio_format_id: audioFormatId
     };
+    resetDownload();
+    const request = {};
+    startRequest = request;
     try {
         const response = await fetch('/api/start-download', {
             method: 'POST',
@@ -437,31 +500,73 @@ async function startDownload(videoFormatId, audioFormatId) {
             body: JSON.stringify(downloadData)
         });
         
-        if (response.status === 409) await restoreActiveDownload();
+        if (startRequest !== request) return;
+        if (response.status === 409) await restoreActiveDownload(request);
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || `Ошибка ${response.status}: ${response.statusText}`);
         }
         
         const statusData = await response.json();
-        trackDownload(statusData);
+        if (startRequest !== request) return;
+        trackDownload(statusData, downloadData.url);
         cancelBtn.focus();
         showSuccess('');
         
     } catch (error) {
+        if (startRequest !== request) return;
         console.error('Error starting download:', error);
         showError(`Ошибка при запуске скачивания: ${error.message}`);
+    } finally {
+        if (startRequest === request) startRequest = null;
     }
 }
 
-async function restoreActiveDownload() {
+async function restoreActiveDownload(request) {
     try {
         const response = await fetch('/api/active-download', {cache: 'no-store'});
         if (!response.ok) return;
         const task = await response.json();
-        if (task && !currentTaskId) trackDownload(task);
+        if (task && startRequest === request) trackDownload(task, task.video.url);
     } catch (error) {
         console.error('Could not restore active download:', error);
+    }
+}
+
+function restoreSavedDownload() {
+    if (currentDownload || startRequest) return;
+    let saved;
+    try {
+        saved = JSON.parse(sessionStorage.getItem(downloadStorageKey));
+    } catch {
+        // Хранилище может быть недоступно в настройках браузера.
+    }
+    if (!saved) return;
+    if (typeof saved.taskId !== 'string' || typeof saved.url !== 'string' || validateUrl(saved.url)) {
+        resetDownload();
+        return;
+    }
+    const download = {taskId: saved.taskId, url: saved.url, restoring: true};
+    currentDownload = download;
+    restoreSourceUrl(download.url);
+    showSuccess('Проверяем статус загрузки…');
+    startPollingFallback();
+}
+
+function restoreSourceUrl(url) {
+    videoUrlInput.value = url;
+    videoUrlInput.dispatchEvent(new Event('input'));
+}
+
+function resetDownload() {
+    stopProgressTracking();
+    currentDownload = null;
+    startRequest = null;
+    saveStatusCheck = null;
+    try {
+        sessionStorage.removeItem(downloadStorageKey);
+    } catch {
+        // Загрузка работает и при отключённом хранилище.
     }
 }
 
@@ -472,27 +577,39 @@ function stopProgressTracking() {
     progressInterval = null;
 }
 
-function trackDownload(task) {
-    stopProgressTracking();
-    currentTaskId = task.task_id;
+function trackDownload(task, url) {
+    currentDownload = {taskId: task.task_id, url};
+    try {
+        sessionStorage.setItem(downloadStorageKey, JSON.stringify(currentDownload));
+    } catch {
+        // Загрузка работает и при отключённом хранилище.
+    }
+    prepareDownloadScreen(task);
+    if (task.status === 'pending') watchDownload(task.task_id);
+    else applyTaskStatus(task);
+}
+
+function prepareDownloadScreen(task) {
     if (task.video && currentVideoData?.url !== task.video.url) {
-        currentVideoData = task.video;
-        displayVideoInfo(task.video);
-        displayFormats(task.video.formats.filter(format => format.video_format_id));
+        const saved = readVideoParameters(currentDownload.url);
+        renderVideoParameters(task.video, saved?.selected);
     }
     downloadPercent.value = 0;
     downloadReadyContainer.hidden = true;
     cancelBtn.hidden = false;
     cancelBtn.disabled = false;
+    progressSection.classList.remove('is-returning');
     showProgress();
     updateProgressDisplay(task);
+}
 
+function watchDownload(taskId) {
     if (!window.EventSource) {
         startPollingFallback();
         return;
     }
 
-    const source = new EventSource('/api/download-events/' + task.task_id);
+    const source = new EventSource('/api/download-events/' + encodeURIComponent(taskId));
     eventSource = source;
     source.onmessage = event => {
         if (eventSource === source) applyTaskStatus(JSON.parse(event.data));
@@ -506,9 +623,25 @@ function trackDownload(task) {
 }
 
 function applyTaskStatus(task) {
-    if (task.task_id !== currentTaskId) return;
+    const download = currentDownload;
+    if (!download || task.task_id !== download.taskId) return;
+    if (task.status === 'done' || task.file_available === false) {
+        showUnavailableDownload(download);
+        return;
+    }
+    if (download.restoring) {
+        download.restoring = false;
+        showSuccess('');
+        if (task.status === 'pending' || task.status === 'completed') {
+            prepareDownloadScreen(task);
+            if (task.status === 'pending' && window.EventSource) {
+                stopProgressTracking();
+                watchDownload(task.task_id);
+            }
+        }
+    }
     if (task.status === 'pending') {
-        updateProgressDisplay(task);
+        if (downloadReadyContainer.hidden) updateProgressDisplay(task);
         return;
     }
     stopProgressTracking();
@@ -516,10 +649,10 @@ function applyTaskStatus(task) {
         updateProgressDisplay(task);
         inspectorTitle.textContent = 'Файл готов';
         cancelBtn.hidden = true;
-        downloadReadyBtn.href = '/api/get-video/' + task.task_id;
+        downloadReadyBtn.href = '/api/get-video/' + encodeURIComponent(task.task_id);
         downloadReadyBtn.removeAttribute('aria-disabled');
         downloadReadyBtn.removeAttribute('tabindex');
-        downloadReadyBtn.textContent = 'Сохранить файл';
+        downloadReadyBtn.textContent = 'Скачать';
         backToFormats.disabled = false;
         downloadReadyContainer.hidden = false;
         if (progressSection.contains(document.activeElement) || document.activeElement === document.body) {
@@ -528,10 +661,25 @@ function applyTaskStatus(task) {
         return;
     }
 
-    currentTaskId = null;
+    resetDownload();
     if (currentVideoData) showResults();
+    else restoreVideoParameters();
     if (task.status === 'error') showError(task.description || 'Ошибка при скачивании');
     else if (task.status === 'canceled') showSuccess('Загрузка отменена.');
+}
+
+function showUnavailableDownload(download) {
+    resetDownload();
+    currentVideoData = null;
+    hideResults();
+    switchTab('analyze');
+    restoreSourceUrl(download.url);
+    try {
+        localStorage.setItem('lastVideoUrl', download.url);
+    } catch {
+        // Исходная ссылка уже восстановлена в форме.
+    }
+    showError('Загрузка или файл больше недоступны. Запустите загрузку заново.');
 }
 
 function startPollingFallback() {
@@ -541,16 +689,24 @@ function startPollingFallback() {
 }
 
 async function checkDownloadProgress() {
-    const taskId = currentTaskId;
-    if (!taskId) return;
+    const download = currentDownload;
+    if (!download || download.checking) return;
+    download.checking = true;
     try {
-        const response = await fetch('/api/download-status/' + taskId);
-        if (taskId !== currentTaskId) return;
-        if (response.ok) applyTaskStatus(await response.json());
-        else if (response.status === 404) applyTaskStatus({task_id: taskId, status: 'error', description: 'Загрузка больше недоступна.'});
+        const response = await fetch('/api/download-status/' + encodeURIComponent(download.taskId), {cache: 'no-store'});
+        const task = response.ok ? await response.json() : null;
+        if (download !== currentDownload) return;
+        if (task) applyTaskStatus(task);
+        else if (isDownloadUnavailable(response)) showUnavailableDownload(download);
     } catch (error) {
         console.error('Could not refresh download status:', error);
+    } finally {
+        download.checking = false;
     }
+}
+
+function isDownloadUnavailable(response) {
+    return [400, 401, 403, 404, 410].includes(response.status);
 }
 
 function updateProgressDisplay(task) {
@@ -593,64 +749,68 @@ function formatEta(seconds) {
 }
 
 async function cancelCurrentTask() {
-    const taskId = currentTaskId;
-    if (!taskId) return;
+    const download = currentDownload;
+    if (!download) return;
     cancelBtn.disabled = true;
     try {
-        const response = await fetch('/api/cancel/' + taskId, {method: 'POST'});
+        const response = await fetch('/api/cancel/' + encodeURIComponent(download.taskId), {method: 'POST'});
+        if (currentDownload !== download) return;
         if (response.status === 409) {
             await checkDownloadProgress();
+            return;
+        }
+        if (isDownloadUnavailable(response)) {
+            showUnavailableDownload(download);
             return;
         }
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
             throw new Error(data.detail || 'Не удалось отменить загрузку');
         }
-        applyTaskStatus({task_id: taskId, status: 'canceled'});
+        applyTaskStatus({task_id: download.taskId, status: 'canceled'});
     } catch (error) {
-        showError(error.message || 'Ошибка при отмене');
+        if (currentDownload === download) showError(error.message || 'Ошибка при отмене');
     } finally {
-        cancelBtn.disabled = false;
+        if (currentDownload === download) cancelBtn.disabled = false;
     }
 }
 
 function returnToFormats() {
-    currentTaskId = null;
-    saveStatusCheck = null;
-    progressSection.classList.remove('is-returning');
+    resetDownload();
     const shouldMoveFocus = progressSection.contains(document.activeElement);
     showResults();
     if (shouldMoveFocus) formatsList.querySelector('select')?.focus();
 }
 
-function finishFileDelivery(taskId) {
-    if (saveStatusCheck !== taskId || currentTaskId !== taskId) return;
+function finishFileDelivery(download) {
     statusText.textContent = 'Файл получен';
     inspectorTitle.textContent = 'Возвращаем параметры';
     progressSection.classList.add('is-returning');
     const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 420;
     setTimeout(() => {
-        if (saveStatusCheck === taskId && currentTaskId === taskId) returnToFormats();
+        if (saveStatusCheck === download && currentDownload === download) returnToFormats();
     }, delay);
 }
 
-async function checkFileDelivery(taskId) {
-    const isCurrent = () => saveStatusCheck === taskId && currentTaskId === taskId && !videoWorkspace.hidden && !progressSection.hidden;
+async function checkFileDelivery(download, fileWasMissing = false) {
+    const isCurrent = () => saveStatusCheck === download && currentDownload === download;
+    let fileMissing = false;
     try {
-        const response = await fetch('/api/download-status/' + taskId, {cache: 'no-store'});
-        if (response.ok && (await response.json()).status === 'done' && isCurrent()) {
-            finishFileDelivery(taskId);
+        const response = await fetch('/api/download-status/' + encodeURIComponent(download.taskId), {cache: 'no-store'});
+        const task = response.ok ? await response.json() : null;
+        if (!isCurrent()) return;
+        if (task?.status === 'done') {
+            finishFileDelivery(download);
             return;
         }
-        if (response.status === 404) {
-            if (saveStatusCheck === taskId) {
-                saveStatusCheck = null;
-                downloadReadyBtn.removeAttribute('aria-disabled');
-                downloadReadyBtn.removeAttribute('tabindex');
-                downloadReadyBtn.textContent = 'Сохранить файл';
-                backToFormats.disabled = false;
-                showError('Не удалось подтвердить передачу файла. Попробуйте ещё раз.');
-            }
+        // The server removes the delivered file just before recording 'done'.
+        fileMissing = task?.file_available === false;
+        if (isDownloadUnavailable(response) || (fileMissing && fileWasMissing)) {
+            showUnavailableDownload(download);
+            return;
+        }
+        if (task?.status === 'error' || task?.status === 'canceled') {
+            applyTaskStatus(task);
             return;
         }
     } catch (error) {
@@ -658,7 +818,7 @@ async function checkFileDelivery(taskId) {
     }
     if (isCurrent()) {
         setTimeout(() => {
-            if (isCurrent()) checkFileDelivery(taskId);
+            if (isCurrent()) checkFileDelivery(download, fileMissing);
         }, 500);
     }
 }

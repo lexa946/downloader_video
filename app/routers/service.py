@@ -135,8 +135,12 @@ async def start_download(request: Request, video_download: SVideoDownload,
 @check_task_id
 async def get_download_status(request: Request, task_id: Annotated[str, Path()]) -> SVideoStatus:
     """Проверяет статус загрузки"""
-    task = await redis_cache.get_download_task(task_id)
     await require_task_owner(request, task_id)
+    task = await redis_cache.get_download_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Загрузка не найдена.")
+    if task.video_status.status == VideoDownloadStatus.COMPLETED:
+        return task.video_status.model_copy(update={"file_available": task.filepath.is_file()})
     return task.video_status
 
 

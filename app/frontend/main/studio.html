@@ -46,6 +46,22 @@
       </div>
     </section>
   </div>
+  <script>
+    document.addEventListener('cookie-consent-accepted', () => {
+      window.yaContextCb = window.yaContextCb || [];
+
+      const context = document.createElement('script');
+      context.src = 'https://yandex.ru/ads/system/context.js';
+      context.async = true;
+
+      const autoplacement = document.createElement('script');
+      autoplacement.dataset.pageId = '20512133';
+      autoplacement.src = 'https://yandex.ru/ads/system/ap-loader.js';
+      autoplacement.async = true;
+
+      document.head.append(context, autoplacement);
+    }, {once: true});
+  </script>
   {% endif %}
   <script defer src="/static/js/cookie-consent.js"></script>
 </body>

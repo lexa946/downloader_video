@@ -3,6 +3,35 @@
 {% set platforms = {'youtube':'YouTube','vk':'ВКонтакте','instagram':'Instagram'} %}
 {% set platform = platforms.get(request.url.path.strip('/').replace('-downloader','')) %}
 <main class="studio">
+
+  <div id="ad-slot-left" class="studio-ad-slot studio-ad-slot--left">
+    <!-- Yandex.RTB R-A-20512133-13 -->
+    <div id="yandex_rtb_R-A-20512133-13"></div>
+    <script>
+    window.yaContextCb.push(() => {
+        Ya.Context.AdvManager.render({
+            "blockId": "R-A-20512133-13",
+            "renderTo": "yandex_rtb_R-A-20512133-13"
+        })
+    })
+</script>
+  </div>
+
+  <div id="ad-slot-right" class="studio-ad-slot studio-ad-slot--right">
+    <!-- Yandex.RTB R-A-20512133-14 -->
+    <div id="yandex_rtb_R-A-20512133-14"></div>
+    <script>
+    window.yaContextCb.push(() => {
+        Ya.Context.AdvManager.render({
+            "blockId": "R-A-20512133-14",
+            "renderTo": "yandex_rtb_R-A-20512133-14"
+        })
+    })
+    </script>
+  </div>
+
+
+
   <section class="signal-hero download-section" aria-labelledby="signal-title">
     <canvas id="signal-art" aria-hidden="true"></canvas>
     <div class="signal-content">
@@ -43,6 +72,20 @@
     </div>
   </section>
   <div id="ytSearchResults" hidden aria-live="polite"></div>
+
+  <div id="ad-slot-inline" class="studio-ad-slot">
+    <!-- Yandex.RTB R-A-20512133-1 -->
+    <div id="yandex_rtb_R-A-20512133-1"></div>
+    <script>
+    window.yaContextCb.push(() => {
+        Ya.Context.AdvManager.render({
+            "blockId": "R-A-20512133-1",
+            "renderTo": "yandex_rtb_R-A-20512133-1"
+        })
+    })
+    </script>
+  </div>
+
   <div class="workspace" id="videoWorkspace" hidden>
     <section class="preview panel" aria-label="Предпросмотр">
       <div class="screen"><img id="videoThumbnail" alt="" style="display:none"></div>

@@ -66,7 +66,27 @@ body {
 .signal-bars i { width: 5px; height: 15px; background: currentColor; transform: skew(-12deg); border-radius: 2px; }
 .signal-bars i:nth-child(2) { height: 26px; }
 .signal-bars i:last-child { height: 19px; }
-.studio { padding: 0 0 24px; }
+.studio {
+    position: relative;
+    padding: 0 0 24px;
+}
+.studio-ad-slot { min-width: 0; }
+.studio-ad-slot:empty,
+.studio-ad-slot--left,
+.studio-ad-slot--right { display: none; }
+
+/* Allow room for both 160px slots, gutters and a vertical scrollbar. */
+@media (min-width: 1720px) {
+    .studio-ad-slot--left:not(:empty),
+    .studio-ad-slot--right:not(:empty) {
+        display: block;
+        position: absolute;
+        top: 0;
+        width: 160px;
+    }
+    .studio-ad-slot--left { right: calc(100% + 24px); }
+    .studio-ad-slot--right { left: calc(100% + 24px); }
+}
 .signal-hero {
     position: relative;
     isolation: isolate;

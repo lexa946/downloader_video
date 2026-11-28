@@ -59,6 +59,7 @@ services:
   worker:
     <<: *app
     command: ["python", "-m", "arq", "app.worker.WorkerSettings"]
+    scale: 2
     healthcheck:
       test: ["CMD", "python", "-m", "arq", "--check", "app.worker.WorkerSettings"]
       interval: 30s

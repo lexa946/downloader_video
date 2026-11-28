@@ -865,6 +865,12 @@ function requestDownloadAd() {
             },
         });
     });
+
+    const script = document.createElement('script');
+    script.src = 'https://yandex.ru/ads/system/context.js';
+    script.async = true;
+    script.addEventListener('error', hideAd, {once: true});
+    document.head.append(script);
 }
 
 // Cleanup on page unload

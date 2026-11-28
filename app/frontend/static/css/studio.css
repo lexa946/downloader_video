@@ -33,8 +33,15 @@
 [hidden] { display: none !important; }
 
 .download-ad {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  align-self: start;
   min-width: 0;
+  background: var(--bg);
 }
+
+.download-ad:has(+ .workspace[hidden]) { display: none; }
 
 .download-ad-label {
   display: block;

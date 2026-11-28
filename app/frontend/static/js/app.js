@@ -830,6 +830,7 @@ function showResults() {
     inspectorTitle.textContent = 'Параметры файла';
     progressSection.hidden = true;
     resultsSection.hidden = false;
+    requestDownloadAd();
 }
 
 function hideResults() {
@@ -860,11 +861,15 @@ function requestDownloadAd() {
             blockId: 'R-A-16518515-5',
             renderTo: banner.id,
             onRender: () => { label.hidden = false; },
-            onError: ({type}) => {
-                if (type === 'error') hideAd();
-            },
+            onError: hideAd,
         });
     });
+
+    const context = document.createElement('script');
+    context.src = 'https://yandex.ru/ads/system/context.js';
+    context.async = true;
+    context.addEventListener('error', hideAd, {once: true});
+    document.head.append(context);
 }
 
 // Cleanup on page unload
